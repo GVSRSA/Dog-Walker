@@ -165,8 +165,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           
           if (profile) {
-            console.log('[AuthContext] Profile loaded, updating auth state:', { id: profile.id, role: profile.role });
+            console.log('[AuthContext] Profile loaded, updating auth state:', { id: profile.id, role: profile.role, is_approved: profile.is_approved });
             const transformedProfile = transformProfile(profile);
+            console.log('[AuthContext] Transformed profile with admin auto-approval:', { 
+              id: transformedProfile.id, 
+              role: transformedProfile.role, 
+              is_approved: transformedProfile.is_approved 
+            });
             setCurrentUser(transformedProfile);
             setIsAuthenticated(true);
             setNeedsProfileCompletion(false);
