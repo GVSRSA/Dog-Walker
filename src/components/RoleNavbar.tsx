@@ -53,13 +53,13 @@ function getHomeRoute(role?: string | null) {
 function roleBadgeClass(role?: string | null) {
   switch (role) {
     case 'admin':
-      return 'bg-purple-100 text-purple-700 ring-1 ring-purple-200';
+      return 'bg-secondary text-foreground ring-1 ring-border';
     case 'provider':
-      return 'bg-blue-100 text-blue-700 ring-1 ring-blue-200';
+      return 'bg-accent text-accent-foreground ring-1 ring-border';
     case 'client':
-      return 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200';
+      return 'bg-secondary text-foreground ring-1 ring-border';
     default:
-      return 'bg-slate-100 text-slate-700 ring-1 ring-slate-200';
+      return 'bg-muted text-muted-foreground ring-1 ring-border';
   }
 }
 
@@ -168,10 +168,10 @@ export default function RoleNavbar({ activeKey }: RoleNavbarProps) {
   };
 
   const statusDotClass = currentUser?.is_suspended
-    ? 'bg-rose-500 ring-rose-200'
+    ? 'bg-destructive ring-destructive/30'
     : currentUser?.is_approved
-      ? 'bg-emerald-500 ring-emerald-200'
-      : 'bg-amber-500 ring-amber-200';
+      ? 'bg-primary ring-primary/25'
+      : 'bg-accent ring-accent/35';
 
   const displayName = currentUser?.full_name?.trim() || currentUser?.email || '—';
   const initials = (currentUser?.full_name?.trim() || currentUser?.email || 'U')
@@ -191,8 +191,8 @@ export default function RoleNavbar({ activeKey }: RoleNavbarProps) {
         size="sm"
         variant="ghost"
         className={cn(
-          'shrink-0 rounded-full px-3 text-slate-700 hover:bg-green-50 hover:text-green-900',
-          isActive && 'bg-green-100 text-green-900 hover:bg-green-100'
+          'shrink-0 rounded-full px-3 text-foreground/80 hover:bg-accent hover:text-accent-foreground',
+          isActive && 'bg-secondary text-foreground hover:bg-secondary'
         )}
       >
         <Link to={item.to}>
@@ -204,21 +204,21 @@ export default function RoleNavbar({ activeKey }: RoleNavbarProps) {
   };
 
   return (
-    <header className="sticky top-0 z-20 border-b bg-white/90 backdrop-blur">
+    <header className="sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={onLogoClick}
-            className="group flex items-center gap-3 rounded-2xl pr-2 text-left transition-colors hover:bg-green-50"
+            className="group flex items-center gap-3 rounded-2xl pr-2 text-left transition-colors hover:bg-accent"
             aria-label="Go to dashboard"
           >
-            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-green-100 ring-1 ring-green-200">
-              <Dog className="h-5 w-5 text-green-700" />
+            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-secondary ring-1 ring-border">
+              <Dog className="h-5 w-5 text-primary" />
             </span>
             <span className="leading-tight">
-              <span className="block text-base font-extrabold tracking-tight text-slate-900">Dog Walker</span>
-              <span className="block text-xs font-semibold text-green-700">by Jolly Walker</span>
+              <span className="block text-base font-extrabold tracking-tight text-foreground">Dog Walker</span>
+              <span className="block text-xs font-semibold text-primary">by Jolly Walker</span>
             </span>
           </button>
 
@@ -237,12 +237,12 @@ export default function RoleNavbar({ activeKey }: RoleNavbarProps) {
                 <button
                   type="button"
                   className={cn(
-                    'group hidden shrink-0 items-center gap-3 rounded-full bg-white px-3 py-1.5 ring-1 ring-slate-200/70 shadow-sm transition-colors hover:bg-slate-50 sm:flex',
-                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-green-300 focus-visible:ring-offset-2'
+                    'group hidden shrink-0 items-center gap-3 rounded-full bg-card px-3 py-1.5 ring-1 ring-border shadow-sm transition-colors hover:bg-accent sm:flex',
+                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
                   )}
                   aria-label="User identity"
                 >
-                  <span className="relative h-9 w-9 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200">
+                  <span className="relative h-9 w-9 overflow-hidden rounded-full bg-secondary ring-1 ring-border">
                     {currentUser?.avatar_url ? (
                       <img
                         src={currentUser.avatar_url}
@@ -252,13 +252,13 @@ export default function RoleNavbar({ activeKey }: RoleNavbarProps) {
                         referrerPolicy="no-referrer"
                       />
                     ) : (
-                      <span className="grid h-full w-full place-items-center text-sm font-semibold text-slate-700">
+                      <span className="grid h-full w-full place-items-center text-sm font-semibold text-foreground/80">
                         {initials}
                       </span>
                     )}
                     <span
                       className={cn(
-                        'absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-white',
+                        'absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-card',
                         statusDotClass
                       )}
                       aria-label={
@@ -279,7 +279,7 @@ export default function RoleNavbar({ activeKey }: RoleNavbarProps) {
                   </span>
 
                   <span className="min-w-0 text-left">
-                    <span className="block max-w-[220px] truncate text-sm font-semibold text-slate-900">
+                    <span className="block max-w-[220px] truncate text-sm font-semibold text-foreground">
                       {displayName}
                     </span>
                     <span className="block">
@@ -290,20 +290,20 @@ export default function RoleNavbar({ activeKey }: RoleNavbarProps) {
                   </span>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64 rounded-2xl border-slate-200/70 p-1">
+              <DropdownMenuContent align="end" className="w-64 rounded-2xl border-border p-1">
                 <DropdownMenuLabel className="px-3 py-2">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-slate-900">{displayName}</div>
-                      <div className="truncate text-xs font-medium text-slate-500">{currentUser?.email}</div>
+                      <div className="truncate text-sm font-semibold text-foreground">{displayName}</div>
+                      <div className="truncate text-xs font-medium text-muted-foreground">{currentUser?.email}</div>
                     </div>
                     <Badge className={cn('rounded-full px-2.5 py-0.5 text-[11px] font-semibold', roleBadgeClass(role))}>
                       {roleLabel(role)}
                     </Badge>
                   </div>
                   <div className="mt-2 flex items-center gap-2">
-                    <span className={cn('h-2.5 w-2.5 rounded-full ring-2', statusDotClass)} />
-                    <span className="text-xs font-medium text-slate-600">
+                    <span className={cn('h-2.5 w-2.5 rounded-full ring-2 ring-border', statusDotClass)} />
+                    <span className="text-xs font-medium text-muted-foreground">
                       {currentUser?.is_suspended
                         ? 'Suspended'
                         : currentUser?.is_approved
@@ -332,7 +332,7 @@ export default function RoleNavbar({ activeKey }: RoleNavbarProps) {
               size="sm"
               variant="ghost"
               onClick={onLogout}
-              className="shrink-0 rounded-full px-3 text-slate-700 hover:bg-rose-50 hover:text-rose-700"
+              className="shrink-0 rounded-full px-3 text-foreground/80 hover:bg-destructive/10 hover:text-destructive"
             >
               <LogOut className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Logout</span>

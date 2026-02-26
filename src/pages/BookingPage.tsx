@@ -15,6 +15,8 @@ import type { Dog, Profile } from '@/types';
 import { CalendarDays, Dog as DogIcon, MapPin, Search, Star } from 'lucide-react';
 import { format } from 'date-fns';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export default function BookingPage() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
@@ -103,6 +105,30 @@ export default function BookingPage() {
       return;
     }
 
+    if (!UUID_RE.test(selectedDogId)) {
+      setError('Selected dog ID is not a valid UUID. Please re-select your dog.');
+      return;
+    }
+
+    // Re-verify the selected dog belongs to the logged-in user (matches RLS expectations)
+    const { data: dogRow, error: dogVerifyError } = await supabase
+      .from('dogs')
+      .select('id,owner_id')
+      .eq('id', selectedDogId)
+      .maybeSingle();
+
+    if (dogVerifyError || !dogRow) {
+      console.error('[BookingPage] Could not verify selected dog', { dogVerifyError, selectedDogId, userId: user.id });
+      setError('Could not verify the selected dog. Please re-select and try again.');
+      return;
+    }
+
+    if (dogRow.owner_id !== user.id) {
+      console.error('[BookingPage] Dog owner mismatch', { selectedDogId, owner_id: dogRow.owner_id, userId: user.id });
+      setError('That dog does not belong to your account. Please re-select and try again.');
+      return;
+    }
+
     const minutes = Number.parseInt(duration || '60', 10);
     const providerRate = Number(selectedProvider.walk_rate ?? selectedProvider.hourly_rate ?? 0);
     const totalFee = (minutes / 60) * providerRate;
@@ -111,7 +137,7 @@ export default function BookingPage() {
     const providerPayout = totalFee - platformFee;
     const scheduledAt = `${date}T${time}`;
 
-    const { error: insertError } = await supabase.from('bookings').insert({
+    const payload = {
       client_id: user.id,
       provider_id: selectedProvider.id,
       dog_id: selectedDogId,
@@ -122,10 +148,21 @@ export default function BookingPage() {
       total_fee: totalFee,
       platform_fee: platformFee,
       provider_payout: providerPayout,
+    };
+
+    console.log('[BookingPage] Creating booking', {
+      client_id: payload.client_id,
+      provider_id: payload.provider_id,
+      dog_id: payload.dog_id,
+      duration: payload.duration,
+      scheduled_at: payload.scheduled_at,
     });
 
+    const { error: insertError } = await supabase.from('bookings').insert(payload);
+
     if (insertError) {
-      setError(insertError.message || 'Failed to create booking.');
+      console.error('[BookingPage] Booking insert failed', insertError);
+      setError(`${insertError.message}${insertError.code ? ` (code: ${insertError.code})` : ''}`);
       return;
     }
 
@@ -294,6 +331,17 @@ export default function BookingPage() {
                           )}
 
                           {error && <p className="text-sm font-semibold text-rose-700">{error}</p>}
+
+                          <div className="rounded-2xl bg-slate-50 p-3 text-xs font-semibold text-slate-700 ring-1 ring-slate-100">
+                            <div className="flex flex-wrap gap-x-3 gap-y-1">
+                              <span className="text-slate-500">client_id:</span>
+                              <span className="break-all">{currentUser?.id || '—'}</span>
+                            </div>
+                            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                              <span className="text-slate-500">dog_id:</span>
+                              <span className="break-all">{selectedDogId || '—'}</span>
+                            </div>
+                          </div>
 
                           <Button
                             onClick={handleBook}

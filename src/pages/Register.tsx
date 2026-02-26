@@ -75,15 +75,15 @@ const Register = () => {
     try {
       console.log('[Register] Attempting registration for:', email);
       const profile = await register(email, password, fullName, role);
-      
+
       if (profile) {
         console.log('[Register] Registration successful, navigating to dashboard');
         setRegisteredRole(role);
         setStep('success');
-        
+
         // Clear loading state immediately and navigate to dashboard
         setIsLoading(false);
-        
+
         // Navigate to appropriate dashboard
         try {
           if (role === 'provider') {
@@ -110,63 +110,56 @@ const Register = () => {
   };
 
   const renderSelectionStep = () => (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-4xl">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <Card className="w-full max-w-4xl rounded-2xl border-border shadow-sm">
         <CardHeader className="text-center pb-8">
           <div className="flex justify-center mb-4">
-            <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center">
-              <Dog className="w-10 h-10 text-white" />
+            <div className="w-20 h-20 bg-secondary rounded-3xl flex items-center justify-center ring-1 ring-border">
+              <Dog className="w-10 h-10 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-3xl">Choose Your Path</CardTitle>
-          <CardDescription className="text-lg">Select how you'd like to use Dog Walker by Jolly Walker</CardDescription>
+          <CardTitle className="text-3xl tracking-tight">Choose Your Path</CardTitle>
+          <CardDescription className="text-lg">
+            Select how you'd like to use Dog Walker by Jolly Walker
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 gap-6">
             {/* Pet Parent Card */}
-            <Card 
-              className="cursor-pointer hover:shadow-xl transition-all duration-300 border-2 hover:border-blue-500 group"
+            <Card
+              className="cursor-pointer rounded-2xl transition-all duration-300 border-2 border-border hover:border-primary/50 hover:shadow-xl group"
               onClick={() => handleSelectRole('client')}
             >
               <CardContent className="p-8">
                 <div className="flex flex-col items-center text-center space-y-4">
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                    <Heart className="w-8 h-8 text-blue-600" />
+                  <div className="w-16 h-16 bg-accent rounded-2xl flex items-center justify-center ring-1 ring-border group-hover:scale-[1.03] transition-transform duration-300">
+                    <Heart className="w-8 h-8 text-accent-foreground" />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">Sign up as a Pet Parent</h3>
-                    <p className="text-gray-600 mb-4">
+                    <h3 className="text-2xl font-extrabold tracking-tight text-foreground mb-2">
+                      Sign up as a Pet Parent
+                    </h3>
+                    <p className="text-muted-foreground mb-4">
                       Find trusted dog walkers in your area and book walks for your furry friends
                     </p>
-                    <ul className="text-left text-sm text-gray-600 space-y-2">
-                      <li className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center">
-                          <User className="w-3 h-3 text-blue-600" />
-                        </div>
-                        <span>Book walks for your pets</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center">
-                          <User className="w-3 h-3 text-blue-600" />
-                        </div>
-                        <span>Track live GPS routes</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center">
-                          <User className="w-3 h-3 text-blue-600" />
-                        </div>
-                        <span>Read provider reviews</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center">
-                          <User className="w-3 h-3 text-blue-600" />
-                        </div>
-                        <span>Pay securely through app</span>
-                      </li>
+                    <ul className="text-left text-sm text-muted-foreground space-y-2">
+                      {[
+                        'Book walks for your pets',
+                        'Track live GPS routes',
+                        'Read provider reviews',
+                        'Pay securely through app',
+                      ].map((line) => (
+                        <li key={line} className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-full bg-secondary flex items-center justify-center ring-1 ring-border">
+                            <User className="w-3 h-3 text-primary" />
+                          </div>
+                          <span>{line}</span>
+                        </li>
+                      ))}
                     </ul>
                   </div>
-                  <Button 
-                    className="w-full bg-blue-700 hover:bg-blue-800 group-hover:scale-105 transition-transform"
+                  <Button
+                    className="w-full rounded-xl bg-accent text-accent-foreground hover:bg-accent/90"
                     onClick={() => handleSelectRole('client')}
                   >
                     Get Started as Pet Parent
@@ -177,49 +170,40 @@ const Register = () => {
             </Card>
 
             {/* Jolly Walker Card */}
-            <Card 
-              className="cursor-pointer hover:shadow-xl transition-all duration-300 border-2 hover:border-green-500 group"
+            <Card
+              className="cursor-pointer rounded-2xl transition-all duration-300 border-2 border-border hover:border-primary/50 hover:shadow-xl group"
               onClick={() => handleSelectRole('provider')}
             >
               <CardContent className="p-8">
                 <div className="flex flex-col items-center text-center space-y-4">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                    <Briefcase className="w-8 h-8 text-green-600" />
+                  <div className="w-16 h-16 bg-secondary rounded-2xl flex items-center justify-center ring-1 ring-border group-hover:scale-[1.03] transition-transform duration-300">
+                    <Briefcase className="w-8 h-8 text-primary" />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">Sign up as a Jolly Walker</h3>
-                    <p className="text-gray-600 mb-4">
+                    <h3 className="text-2xl font-extrabold tracking-tight text-foreground mb-2">
+                      Sign up as a Jolly Walker
+                    </h3>
+                    <p className="text-muted-foreground mb-4">
                       Offer your dog walking services and earn money doing what you love
                     </p>
-                    <ul className="text-left text-sm text-gray-600 space-y-2">
-                      <li className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center">
-                          <User className="w-3 h-3 text-green-600" />
-                        </div>
-                        <span>Set your own rates & schedule</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center">
-                          <User className="w-3 h-3 text-green-600" />
-                        </div>
-                        <span>Accept bookings on your terms</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center">
-                          <User className="w-3 h-3 text-green-600" />
-                        </div>
-                        <span>Build your reputation</span>
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center">
-                          <User className="w-3 h-3 text-green-600" />
-                        </div>
-                        <span>Receive secure payments</span>
-                      </li>
+                    <ul className="text-left text-sm text-muted-foreground space-y-2">
+                      {[
+                        'Set your own rates & schedule',
+                        'Accept bookings on your terms',
+                        'Build your reputation',
+                        'Receive secure payments',
+                      ].map((line) => (
+                        <li key={line} className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-full bg-secondary flex items-center justify-center ring-1 ring-border">
+                            <User className="w-3 h-3 text-primary" />
+                          </div>
+                          <span>{line}</span>
+                        </li>
+                      ))}
                     </ul>
                   </div>
-                  <Button 
-                    className="w-full bg-green-700 hover:bg-green-800 group-hover:scale-105 transition-transform"
+                  <Button
+                    className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
                     onClick={() => handleSelectRole('provider')}
                   >
                     Become a Jolly Walker
@@ -231,13 +215,13 @@ const Register = () => {
           </div>
 
           <div className="mt-8 text-center text-sm">
-            <span className="text-gray-600">Already have an account? </span>
-            <Link to="/login" className="text-green-700 hover:underline font-medium">
+            <span className="text-muted-foreground">Already have an account? </span>
+            <Link to="/login" className="text-primary hover:underline font-semibold">
               Sign in
             </Link>
           </div>
           <div className="mt-4 text-center text-sm">
-            <Link to="/" className="text-gray-600 hover:text-green-700 font-medium">
+            <Link to="/" className="text-muted-foreground hover:text-foreground font-medium">
               ← Back to Home
             </Link>
           </div>
@@ -247,48 +231,46 @@ const Register = () => {
   );
 
   const renderSuccessStep = () => (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <Card className="w-full max-w-md rounded-2xl border-border shadow-sm">
         <CardContent className="p-8 text-center space-y-6">
           <div className="flex justify-center">
-            <div className={`w-20 h-20 rounded-full flex items-center justify-center ${
-              registeredRole === 'client' 
-                ? 'bg-gradient-to-br from-blue-400 to-blue-600' 
-                : 'bg-gradient-to-br from-green-400 to-green-600'
-            }`}>
-              <CheckCircle2 className="w-10 h-10 text-white" />
+            <div
+              className={`w-20 h-20 rounded-3xl flex items-center justify-center ring-1 ring-border ${
+                registeredRole === 'client' ? 'bg-accent text-accent-foreground' : 'bg-primary text-primary-foreground'
+              }`}
+            >
+              <CheckCircle2 className="w-10 h-10" />
             </div>
           </div>
-          
+
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Registration Successful!</h2>
-            <p className="text-gray-600">
-              Your account has been created. You can now access your dashboard.
-            </p>
+            <h2 className="text-2xl font-extrabold tracking-tight text-foreground mb-2">
+              Registration Successful!
+            </h2>
+            <p className="text-muted-foreground">Your account has been created. You can now access your dashboard.</p>
           </div>
 
           <div className="space-y-3">
-            <Button 
+            <Button
               onClick={handleGoToDashboard}
-              className={`w-full ${
-                registeredRole === 'client' 
-                  ? 'bg-blue-700 hover:bg-blue-800' 
-                  : 'bg-green-700 hover:bg-green-800'
+              className={`w-full rounded-xl ${
+                registeredRole === 'client'
+                  ? 'bg-accent text-accent-foreground hover:bg-accent/90'
+                  : 'bg-primary text-primary-foreground hover:bg-primary/90'
               }`}
               size="lg"
             >
               {registeredRole === 'client' ? 'Go to Pet Dashboard' : 'Go to Provider Dashboard'}
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
-            
-            <p className="text-xs text-gray-500">
-              If the automatic redirect doesn't work, click the button above.
-            </p>
+
+            <p className="text-xs text-muted-foreground">If the automatic redirect doesn't work, click the button above.</p>
           </div>
 
-          <div className="pt-4 border-t">
-            <p className="text-sm text-gray-600">
-              Welcome to the Jolly Walker community, {fullName}! 🐕
+          <div className="pt-4 border-t border-border">
+            <p className="text-sm text-muted-foreground">
+              Welcome to the Jolly Walker community, <span className="font-semibold text-foreground">{fullName}</span>!
             </p>
           </div>
         </CardContent>
@@ -297,43 +279,40 @@ const Register = () => {
   );
 
   const renderFormStep = () => (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <Card className="w-full max-w-md rounded-2xl border-border shadow-sm">
         <CardHeader className="text-center">
           <Button
             variant="ghost"
             onClick={handleBack}
-            className="mb-4 text-gray-600 hover:text-gray-900"
+            className="mb-4 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent"
           >
             ← Back to selection
           </Button>
           <div className="flex justify-center mb-4">
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
-              role === 'client' 
-                ? 'bg-gradient-to-br from-blue-400 to-blue-600' 
-                : 'bg-gradient-to-br from-green-400 to-green-600'
-            }`}>
+            <div
+              className={`w-16 h-16 rounded-2xl flex items-center justify-center ring-1 ring-border ${
+                role === 'client' ? 'bg-accent text-accent-foreground' : 'bg-secondary'
+              }`}
+            >
               {role === 'client' ? (
-                <Heart className="w-8 h-8 text-white" />
+                <Heart className="w-8 h-8" />
               ) : (
-                <Briefcase className="w-8 h-8 text-white" />
+                <Briefcase className="w-8 h-8 text-primary" />
               )}
             </div>
           </div>
-          <CardTitle className="text-2xl">
+          <CardTitle className="text-2xl tracking-tight">
             {role === 'client' ? 'Create Pet Parent Account' : 'Create Jolly Walker Account'}
           </CardTitle>
           <CardDescription>
-            {role === 'client' 
-              ? 'Join as a Pet Parent to book walks for your dogs'
-              : 'Join as a Jolly Walker to offer your services'
-            }
+            {role === 'client' ? 'Join as a Pet Parent to book walks for your dogs' : 'Join as a Jolly Walker to offer your services'}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
+              <div className="bg-destructive/10 border border-destructive/25 text-destructive px-4 py-3 rounded-xl text-sm">
                 {error}
               </div>
             )}
@@ -349,6 +328,7 @@ const Register = () => {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
+                className="rounded-xl"
               />
             </div>
 
@@ -363,6 +343,7 @@ const Register = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="rounded-xl"
               />
             </div>
 
@@ -377,6 +358,7 @@ const Register = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                className="rounded-xl"
               />
             </div>
 
@@ -391,12 +373,17 @@ const Register = () => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
+                className="rounded-xl"
               />
             </div>
 
-            <Button 
-              type="submit" 
-              className={`w-full ${role === 'client' ? 'bg-blue-700 hover:bg-blue-800' : 'bg-green-700 hover:bg-green-800'}`} 
+            <Button
+              type="submit"
+              className={`w-full rounded-xl ${
+                role === 'client'
+                  ? 'bg-accent text-accent-foreground hover:bg-accent/90'
+                  : 'bg-primary text-primary-foreground hover:bg-primary/90'
+              }`}
               disabled={isLoading}
             >
               {isLoading ? 'Creating Account...' : 'Create Account'}
@@ -404,8 +391,8 @@ const Register = () => {
           </form>
 
           <div className="mt-6 text-center text-sm">
-            <span className="text-gray-600">Already have an account? </span>
-            <Link to="/login" className={role === 'client' ? 'text-blue-700 hover:underline font-medium' : 'text-green-700 hover:underline font-medium'}>
+            <span className="text-muted-foreground">Already have an account? </span>
+            <Link to="/login" className="text-primary hover:underline font-semibold">
               Sign in
             </Link>
           </div>
