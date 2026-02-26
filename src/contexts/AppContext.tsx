@@ -266,11 +266,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const login = async (email: string, password: string) => {
     const user = users.find(u => u.email === email);
-    if (user && !user.isSuspended) {
-      setCurrentUser(user);
-    } else {
-      throw new Error('Invalid credentials or account suspended');
+    if (!user) {
+      throw new Error('User not found');
     }
+    if (user.isSuspended) {
+      throw new Error('Account is suspended');
+    }
+    // For demo purposes, any password is accepted
+    // In production, you would validate the password here
+    setCurrentUser(user);
   };
 
   const logout = () => {

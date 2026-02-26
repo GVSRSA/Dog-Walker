@@ -53,16 +53,16 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">
-              <Dog className="w-8 h-8 text-orange-500" />
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+              <Dog className="w-8 h-8 text-green-700" />
             </div>
           </div>
           <CardTitle className="text-2xl">Create Account</CardTitle>
-          <CardDescription>Join PawsWalk today</CardDescription>
+          <CardDescription>Join Dog Walker by Jolly Walker</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -79,7 +79,7 @@ const Register = () => {
                   type="button"
                   variant={role === 'client' ? 'default' : 'outline'}
                   onClick={() => setRole('client')}
-                  className={role === 'client' ? 'bg-blue-500 hover:bg-blue-600' : ''}
+                  className={role === 'client' ? 'bg-blue-700 hover:bg-blue-800' : 'text-blue-700 border-blue-300 hover:bg-blue-50'}
                 >
                   Book Walks
                 </Button>
@@ -87,7 +87,7 @@ const Register = () => {
                   type="button"
                   variant={role === 'provider' ? 'default' : 'outline'}
                   onClick={() => setRole('provider')}
-                  className={role === 'provider' ? 'bg-green-500 hover:bg-green-600' : ''}
+                  className={role === 'provider' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
                 >
                   Provide Services
                 </Button>
@@ -123,7 +123,7 @@ const Register = () => {
               <Input
                 id="password"
                 type="password"
-                placeholder="••••••••"
+                placeholder="•••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -135,21 +135,21 @@ const Register = () => {
               <Input
                 id="confirmPassword"
                 type="password"
-                placeholder="••••••••"
+                placeholder="•••••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
               />
             </div>
 
-            <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600" disabled={isLoading}>
+            <Button type="submit" className="w-full bg-green-700 hover:bg-green-800" disabled={isLoading}>
               {isLoading ? 'Creating Account...' : 'Create Account'}
             </Button>
           </form>
 
           <div className="mt-6 text-center text-sm">
             <span className="text-gray-600">Already have an account? </span>
-            <Link to="/login" className="text-orange-600 hover:underline font-medium">
+            <Link to="/login" className="text-green-700 hover:underline font-medium">
               Sign in
             </Link>
           </div>
