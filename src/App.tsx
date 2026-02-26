@@ -16,6 +16,10 @@ import ProviderDashboard from "./pages/ProviderDashboard";
 import ClientDashboard from "./pages/ClientDashboard";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
+import MyDogs from "./pages/MyDogs";
+import BookingPage from "./pages/BookingPage";
+import MyBookings from "./pages/MyBookings";
+import LiveWalk from "./pages/LiveWalk";
 
 const queryClient = new QueryClient();
 
@@ -77,7 +81,41 @@ const AppContent = () => {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/complete-profile" element={<CompleteProfile />} />
-          
+
+          {/* Client pages */}
+          <Route
+            path="/my-dogs"
+            element={
+              <ProtectedRoute allowedRoles={['client']}>
+                <MyDogs />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/book"
+            element={
+              <ProtectedRoute allowedRoles={['client']}>
+                <BookingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/my-bookings"
+            element={
+              <ProtectedRoute allowedRoles={['client']}>
+                <MyBookings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/live-walk/:bookingId"
+            element={
+              <ProtectedRoute allowedRoles={['client', 'provider']}>
+                <LiveWalk />
+              </ProtectedRoute>
+            }
+          />
+
           {/* Protected Routes - Admin Only */}
           <Route 
             path="/admin" 

@@ -168,14 +168,14 @@ const ProviderDashboard = () => {
           {
             enableHighAccuracy: true,
             timeout: 10000,
-            maximumAge: 60000,
+            maximumAge: 0,
           }
         );
       };
 
       trackLocation();
 
-      const intervalId = setInterval(trackLocation, 5 * 60 * 1000);
+      const intervalId = setInterval(trackLocation, 10 * 1000);
       setTrackingInterval(intervalId);
 
       const { data, error: fetchError } = await fetchBookings(currentUser.id, 'provider');

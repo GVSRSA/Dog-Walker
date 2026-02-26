@@ -190,9 +190,28 @@ const ClientDashboard = () => {
 
     fetchBreadcrumbs();
 
-    const refreshInterval = setInterval(fetchBreadcrumbs, 30000);
+    const channel = supabase
+      .channel(`walk_breadcrumbs:${activeBooking.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'walk_breadcrumbs',
+          filter: `walk_session_id=eq.${activeBooking.id}`,
+        },
+        (payload) => {
+          setActiveWalkBreadcrumbs((prev) => {
+            const next = [payload.new as any, ...prev];
+            return next.slice(0, 10);
+          });
+        }
+      )
+      .subscribe();
 
-    return () => clearInterval(refreshInterval);
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [bookings]);
 
   const handleRateBooking = (booking: Booking) => {
@@ -238,7 +257,27 @@ const ClientDashboard = () => {
       return;
     }
 
+    setBookingError('');
+
     try {
+      // Re-check provider approval at booking time
+      const { data: providerCheck, error: providerCheckError } = await supabase
+        .from('profiles')
+        .select('is_approved,is_suspended')
+        .eq('id', selectedProvider.id)
+        .single();
+
+      if (providerCheckError) {
+        console.error('Error verifying provider approval:', providerCheckError);
+        setBookingError('Could not verify provider approval. Please try again.');
+        return;
+      }
+
+      if (!providerCheck?.is_approved || providerCheck?.is_suspended) {
+        setBookingError('This walker is not approved (or is currently unavailable). Please choose another.');
+        return;
+      }
+
       const price = (parseFloat(selectedDuration) * (selectedProvider.hourly_rate || 0)) / 60;
       const platformFee = price * 0.15;
       const providerPayout = price - platformFee;
@@ -270,15 +309,7 @@ const ClientDashboard = () => {
         setBookingError('');
         alert('Booking created successfully!');
 
-        const { data, error: fetchError } = await supabase
-          .from('bookings')
-          .select('*')
-          .eq('client_id', currentUser.id)
-          .order('scheduled_at', { ascending: true, nullsFirst: false });
-
-        if (!fetchError) {
-          setBookings(data || []);
-        }
+        navigate('/my-bookings', { replace: true });
       }
     } catch (err) {
       console.error('Booking error:', err);

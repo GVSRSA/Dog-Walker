@@ -179,7 +179,7 @@ const Profile = () => {
 
     // Prepare to dog object with proper type conversions
     const dogData = {
-      owner_id: profile!.id,
+      owner_id: (await supabase.auth.getUser()).data.user?.id,
       name: newDog.name,
       breed: newDog.breed,
       age: Number(newDog.age) || 0,
@@ -187,6 +187,13 @@ const Profile = () => {
       special_instructions: newDog.special_instructions || '',
       image_url: imageUrl || null,
     };
+
+    if (!dogData.owner_id) {
+      setAddDogStatus('error');
+      setUploadingImage(false);
+      alert('You must be logged in to add a dog.');
+      return;
+    }
 
     console.log('[handleAddDog] Attempting to add dog with data:', dogData);
     console.log('[handleAddDog] Age type:', typeof dogData.age, 'Value:', dogData.age);
@@ -227,7 +234,7 @@ const Profile = () => {
       const { data: dogsData } = await supabase
         .from('dogs')
         .select('*')
-        .eq('owner_id', profile!.id)
+        .eq('owner_id', dogData.owner_id)
         .order('created_at', { ascending: false });
       setDogs(dogsData || []);
       

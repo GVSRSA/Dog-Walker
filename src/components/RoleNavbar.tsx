@@ -22,7 +22,7 @@ function getDashboardRoute(role?: string | null) {
     case 'provider':
       return '/provider#walks';
     case 'client':
-      return '/client#dogs';
+      return '/my-dogs';
     default:
       return '/';
   }
@@ -44,9 +44,9 @@ export default function RoleNavbar({ activeKey }: RoleNavbarProps) {
     ];
   } else if (role === 'client') {
     items = [
-      { key: 'dogs', label: 'My Dogs', to: '/client#dogs', icon: PawPrint },
-      { key: 'bookings', label: 'Bookings', to: '/client#bookings', icon: CalendarDays },
-      { key: 'find', label: 'Find Walkers', to: '/client#find', icon: Search },
+      { key: 'dogs', label: 'My Dogs', to: '/my-dogs', icon: PawPrint },
+      { key: 'bookings', label: 'My Bookings', to: '/my-bookings', icon: CalendarDays },
+      { key: 'find', label: 'Book', to: '/book', icon: Search },
     ];
   } else if (role === 'provider') {
     items = [
