@@ -10,11 +10,11 @@ import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { RatingModal } from '@/components/RatingModal';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchBookings, fetchProfile } from '@/utils/supabase/helpers';
+import { fetchBookings } from '@/utils/supabase/helpers';
 import { supabase } from '@/integrations/supabase/client';
 import type { Profile, Booking } from '@/types';
-import {
-  LogOut, MapPin, Clock, DollarSign, Star,
+import { 
+  LogOut, MapPin, Clock, DollarSign, Star, 
   ShoppingCart, Play, Square, CreditCard, User,
   Dog
 } from 'lucide-react';
@@ -35,7 +35,6 @@ const ProviderDashboard = () => {
   const [watchId, setWatchId] = useState<number | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [ratingBooking, setRatingBooking] = useState<Booking | null>(null);
-  const [selectedClient, setSelectedClient] = useState<Profile | null>(null);
 
   // Fetch bookings for provider
   useEffect(() => {
@@ -47,8 +46,9 @@ const ProviderDashboard = () => {
         const { data, error } = await fetchBookings(currentUser.id, 'provider');
         if (error) {
           console.error('Error fetching bookings:', error);
+        } else {
+          setBookings(data || []);
         }
-        setBookings(data || []);
       } catch (err) {
         console.error('Error:', err);
       } finally {
@@ -219,15 +219,15 @@ const ProviderDashboard = () => {
         alert('Failed to purchase credits');
       } else {
         // Update provider credit balance
-        const { error: updateError } = await supabase
+        const { error: balanceError } = await supabase
           .from('profiles')
           .update({
             credit_balance: (provider?.credit_balance || 0) + creditAmount,
           })
           .eq('id', currentUser.id);
 
-        if (updateError) {
-          console.error('Error updating credit balance:', updateError);
+        if (balanceError) {
+          console.error('Error updating credit balance:', balanceError);
         } else {
           alert('Successfully purchased credits!');
           setShowPurchaseModal(false);
@@ -248,17 +248,6 @@ const ProviderDashboard = () => {
 
   // Calculate earnings from completed bookings
   const totalEarnings = completedBookings.reduce((sum, b) => sum + (b.provider_payout || 0), 0);
-
-  // Fetch client profile for booking
-  const getClientProfile = async (clientId: string) => {
-    try {
-      const { data } = await fetchProfile(clientId);
-      return data;
-    } catch (err) {
-      console.error('Error fetching client profile:', err);
-      return null;
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">

@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { useApp } from '@/contexts/AppContext';
 import { Dog } from 'lucide-react';
+import type { Profile } from '@/types';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -14,10 +14,7 @@ const Login = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
-  const { users, setCurrentUser } = useApp();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const roleParam = searchParams.get('role');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,26 +22,22 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      const profile = await login(email, password);
       
-      // Find the user and set current user for role-based routing
-      const user = users.find(u => u.email === email);
-      if (user) {
-        setCurrentUser(user);
-        
+      if (profile) {
         // Redirect based on user role
-        if (user.role === 'admin') {
+        if (profile.role === 'admin') {
           navigate('/admin');
-        } else if (user.role === 'provider') {
+        } else if (profile.role === 'provider') {
           navigate('/provider');
         } else {
           navigate('/client');
         }
       } else {
-        setError('User not found');
+        setError('Login failed. Please check your credentials.');
       }
-    } catch (err) {
-      setError('Invalid email or password');
+    } catch (err: any) {
+      setError(err.message || 'Invalid email or password');
     } finally {
       setIsLoading(false);
     }
@@ -85,7 +78,7 @@ const Login = () => {
               <Input
                 id="password"
                 type="password"
-                placeholder="•••••••"
+                placeholder="•••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -100,32 +93,6 @@ const Login = () => {
             <Link to="/register" className="text-green-700 hover:underline font-medium">
               Sign up
             </Link>
-          </div>
-          <div className="mt-4 pt-4 border-t">
-            <p className="text-xs text-gray-500 mb-2">Demo accounts (any password works):</p>
-            <div className="text-xs space-y-1">
-              <button
-                type="button"
-                onClick={() => { setEmail('admin@paws.com'); setPassword('demo'); }}
-                className="block w-full text-left text-purple-600 hover:underline py-1"
-              >
-                👨‍💼 Admin: admin@paws.com
-              </button>
-              <button
-                type="button"
-                onClick={() => { setEmail('sarah@paws.com'); setPassword('demo'); }}
-                className="block w-full text-left text-green-700 hover:underline py-1"
-              >
-                🚶 Provider: sarah@paws.com
-              </button>
-              <button
-                type="button"
-                onClick={() => { setEmail('emily@paws.com'); setPassword('demo'); }}
-                className="block w-full text-left text-blue-700 hover:underline py-1"
-              >
-                🐕 Client: emily@paws.com
-              </button>
-            </div>
           </div>
         </CardContent>
       </Card>

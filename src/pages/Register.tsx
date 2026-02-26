@@ -4,21 +4,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useApp } from '@/contexts/AppContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Dog, User, Heart, Briefcase, ArrowRight } from 'lucide-react';
 
 type RegisterStep = 'selection' | 'form';
 
 const Register = () => {
   const [step, setStep] = useState<RegisterStep>('selection');
-  const [name, setName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<'client' | 'provider'>('client');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { register } = useApp();
+  const { register } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -59,10 +59,11 @@ const Register = () => {
     setIsLoading(true);
 
     try {
-      await register(name, email, password, role);
-      navigate('/login');
-    } catch (err) {
-      setError('Registration failed. Please try again.');
+      await register(email, password, role);
+      // After registration, redirect to login
+      navigate('/login?registered=true');
+    } catch (err: any) {
+      setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -120,7 +121,7 @@ const Register = () => {
                         <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center">
                           <User className="w-3 h-3 text-blue-600" />
                         </div>
-                        <span>Pay securely through the app</span>
+                        <span>Pay securely through app</span>
                       </li>
                     </ul>
                   </div>
@@ -243,13 +244,13 @@ const Register = () => {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+              <Label htmlFor="fullName">Full Name</Label>
               <Input
-                id="name"
+                id="fullName"
                 type="text"
                 placeholder="John Doe"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
                 required
               />
             </div>
@@ -271,7 +272,7 @@ const Register = () => {
               <Input
                 id="password"
                 type="password"
-                placeholder="•••••••"
+                placeholder="•••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -283,7 +284,7 @@ const Register = () => {
               <Input
                 id="confirmPassword"
                 type="password"
-                placeholder="•••••••"
+                placeholder="•••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required

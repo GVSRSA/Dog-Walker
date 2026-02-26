@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,124 +7,210 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { useApp } from '@/contexts/AppContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import type { Profile, Dog } from '@/types';
 import { 
   LogOut, User, MapPin, Phone, Calendar, 
-  Shield, Dog, Star, DollarSign, Clock, 
+  Shield, Dog as DogIcon, Star, DollarSign, 
   CheckCircle, XCircle, Plus, Trash2 
 } from 'lucide-react';
 
 const Profile = () => {
-  const { currentUser, updateProfile, addDog, removeDog, getReviews, getAverageRating, users } = useApp();
-  const { logout } = useAuth();
+  const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
+  const profile = currentUser as Profile;
 
   const [isEditing, setIsEditing] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | null>(null);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [showAddDogModal, setShowAddDogModal] = useState(false);
+  const [dogs, setDogs] = useState<Dog[]>([]);
+  const [loadingDogs, setLoadingDogs] = useState(false);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  
   const [newDog, setNewDog] = useState({
     name: '',
     breed: '',
     age: 0,
     weight: 0,
-    notes: '',
+    special_instructions: '',
   });
 
-  // Get reviews for the current user
-  const myReviews = currentUser ? getReviews(currentUser.id) : [];
-  const averageRating = currentUser ? getAverageRating(currentUser.id) : 0;
-
-  // Form state for different user types
   const [formData, setFormData] = useState({
-    name: '',
+    full_name: '',
     email: '',
-    phone: '',
     bio: '',
-    location: { lat: 0, lng: 0, address: '' },
-    neighborhood: '',
-    hourlyRate: 0,
+    location: { lat: 0, lng: 0, address: '' } as any,
+    hourly_rate: 0,
     services: [] as string[],
-    availableCredits: 0,
-    rating: 0,
-    avg_rating: 0,
-    totalWalks: 0,
-    review_count: 0,
-    availability: { days: [] as string[], startTime: '', endTime: '' },
   });
+
+  // Fetch dogs for current user
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    const fetchUserDogs = async () => {
+      setLoadingDogs(true);
+      try {
+        const { data, error } = await supabase
+          .from('dogs')
+          .select('*')
+          .eq('owner_id', profile.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching dogs:', error);
+        } else {
+          setDogs(data || []);
+        }
+      } catch (err) {
+        console.error('Error:', err);
+      } finally {
+        setLoadingDogs(false);
+      }
+    };
+
+    fetchUserDogs();
+  }, [profile?.id]);
+
+  // Fetch reviews for current user
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    const fetchUserReviews = async () => {
+      setLoadingReviews(true);
+      try {
+        const { data, error } = await supabase
+          .from('reviews')
+          .select('*')
+          .eq('provider_id', profile.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching reviews:', error);
+        } else {
+          setReviews(data || []);
+        }
+      } catch (err) {
+        console.error('Error:', err);
+      } finally {
+        setLoadingReviews(false);
+      }
+    };
+
+    fetchUserReviews();
+  }, [profile?.id]);
 
   // Sync form data with current user
   useEffect(() => {
-    if (currentUser) {
+    if (profile) {
       setFormData({
-        name: currentUser.name || '',
-        email: currentUser.email || '',
-        phone: (currentUser as any).phone || '',
-        bio: (currentUser as any).bio || '',
-        location: (currentUser as any).location || { lat: 0, lng: 0, address: '' },
-        neighborhood: (currentUser as any).neighborhood || '',
-        hourlyRate: (currentUser as any).hourlyRate || 0,
-        services: (currentUser as any).services || [],
-        availableCredits: (currentUser as any).availableCredits || 0,
-        rating: (currentUser as any).rating || 0,
-        avg_rating: (currentUser as any).avg_rating || 0,
-        totalWalks: (currentUser as any).totalWalks || 0,
-        review_count: (currentUser as any).review_count || 0,
-        availability: (currentUser as any).availability || { days: [], startTime: '09:00', endTime: '18:00' },
+        full_name: profile.full_name || '',
+        email: profile.email || '',
+        bio: profile.bio || '',
+        location: profile.location || { lat: 0, lng: 0, address: '' },
+        hourly_rate: profile.hourly_rate || 0,
+        services: profile.services || [],
       });
     }
-  }, [currentUser]);
+  }, [profile]);
 
   const handleLogout = () => {
     logout();
     navigate('/');
   };
 
-  const handleAddDog = () => {
+  const handleAddDog = async () => {
     if (!newDog.name || !newDog.breed) return;
 
-    addDog(currentUser!.id, {
-      name: newDog.name,
-      breed: newDog.breed,
-      age: newDog.age || 0,
-      weight: newDog.weight || 0,
-      notes: newDog.notes || '',
-    });
+    try {
+      const { error } = await supabase
+        .from('dogs')
+        .insert({
+          owner_id: profile!.id,
+          name: newDog.name,
+          breed: newDog.breed,
+          age: newDog.age || 0,
+          weight: newDog.weight || 0,
+          special_instructions: newDog.special_instructions || '',
+        });
 
-    setNewDog({ name: '', breed: '', age: 0, weight: 0, notes: '' });
-    setShowAddDogModal(false);
-  };
-
-  const handleRemoveDog = (dogId: string) => {
-    if (window.confirm('Are you sure you want to remove this dog?')) {
-      removeDog(currentUser!.id, dogId);
+      if (error) {
+        console.error('Error adding dog:', error);
+        alert('Failed to add dog');
+      } else {
+        setNewDog({ name: '', breed: '', age: 0, weight: 0, special_instructions: '' });
+        setShowAddDogModal(false);
+        
+        // Refresh dogs
+        const { data } = await supabase
+          .from('dogs')
+          .select('*')
+          .eq('owner_id', profile!.id)
+          .order('created_at', { ascending: false });
+        setDogs(data || []);
+      }
+    } catch (err) {
+      console.error('Error:', err);
+      alert('Failed to add dog');
     }
   };
 
-  const handleSave = () => {
+  const handleRemoveDog = async (dogId: string) => {
+    if (window.confirm('Are you sure you want to remove this dog?')) {
+      try {
+        const { error } = await supabase
+          .from('dogs')
+          .delete()
+          .eq('id', dogId);
+
+        if (error) {
+          console.error('Error removing dog:', error);
+          alert('Failed to remove dog');
+        } else {
+          setDogs(dogs.filter(d => d.id !== dogId));
+        }
+      } catch (err) {
+        console.error('Error:', err);
+        alert('Failed to remove dog');
+      }
+    }
+  };
+
+  const handleSave = async () => {
     setSaveStatus('saving');
     try {
-      // Simulate API call
-      setTimeout(() => {
-        updateProfile(currentUser!.id, {
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: formData.full_name,
           bio: formData.bio,
           location: formData.location,
-          hourlyRate: formData.hourlyRate,
+          hourly_rate: formData.hourly_rate,
           services: formData.services,
-          availability: formData.availability,
-        });
+        })
+        .eq('id', profile!.id);
+
+      if (error) {
+        console.error('Error updating profile:', error);
+        setSaveStatus('error');
+      } else {
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus(null), 2000);
-      }, 500);
+      }
     } catch (error) {
       console.error('Failed to save profile:', error);
       setSaveStatus('error');
       setTimeout(() => setSaveStatus(null), 2000);
     }
+  };
+
+  const calculateAverageRating = () => {
+    if (reviews.length === 0) return 0;
+    const sum = reviews.reduce((acc, r) => acc + r.rating, 0);
+    return sum / reviews.length;
   };
 
   const renderClientProfile = () => (
@@ -135,11 +221,11 @@ const Profile = () => {
           {isEditing ? (
             <Input
               id="client-name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              value={formData.full_name}
+              onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
             />
           ) : (
-            <p className="text-sm text-gray-600 mt-1">{currentUser?.name}</p>
+            <p className="text-sm text-gray-600 mt-1">{profile?.full_name}</p>
           )}
         </div>
 
@@ -153,20 +239,7 @@ const Profile = () => {
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             />
           ) : (
-            <p className="text-sm text-gray-600 mt-1">{currentUser?.email}</p>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="client-phone">Phone</Label>
-          {isEditing ? (
-            <Input
-              id="client-phone"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            />
-          ) : (
-            <p className="text-sm text-gray-600 mt-1">{(currentUser as any).phone || 'Not provided'}</p>
+            <p className="text-sm text-gray-600 mt-1">{profile?.email}</p>
           )}
         </div>
 
@@ -184,20 +257,6 @@ const Profile = () => {
           )}
         </div>
 
-        <div>
-          <Label htmlFor="client-neighborhood">Neighborhood/Suburb</Label>
-          {isEditing ? (
-            <Input
-              id="client-neighborhood"
-              placeholder="e.g., Sandton, Sea Point"
-              value={formData.neighborhood || ''}
-              onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
-            />
-          ) : (
-            <p className="text-sm text-gray-600 mt-1">{formData.neighborhood || 'Not provided'}</p>
-          )}
-        </div>
-
         <div className="pt-4 border-t">
           <div className="flex items-center justify-between mb-4">
             <Label className="text-base font-semibold">My Dogs</Label>
@@ -210,19 +269,19 @@ const Profile = () => {
               Add Dog
             </Button>
           </div>
-          {(currentUser as any).dogs && (currentUser as any).dogs.length > 0 ? (
+          {dogs.length > 0 ? (
             <div className="space-y-3">
-              {(currentUser as any).dogs.map((dog: any) => (
+              {dogs.map((dog) => (
                 <div key={dog.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                      <Dog className="w-6 h-6 text-blue-600" />
+                      <DogIcon className="w-6 h-6 text-blue-600" />
                     </div>
                     <div>
                       <p className="font-semibold text-gray-900">{dog.name}</p>
                       <p className="text-sm text-gray-600">{dog.breed} {dog.age > 0 && `• ${dog.age} years old`}</p>
-                      {dog.notes && (
-                        <p className="text-xs text-gray-500 mt-1 max-w-md truncate">{dog.notes}</p>
+                      {dog.special_instructions && (
+                        <p className="text-xs text-gray-500 mt-1 max-w-md truncate">{dog.special_instructions}</p>
                       )}
                     </div>
                   </div>
@@ -242,7 +301,7 @@ const Profile = () => {
             </div>
           ) : (
             <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <Dog className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <DogIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
               <p className="text-gray-600 mb-2">No dogs registered yet</p>
               <Button
                 size="sm"
@@ -268,11 +327,11 @@ const Profile = () => {
           {isEditing ? (
             <Input
               id="provider-name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              value={formData.full_name}
+              onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
             />
           ) : (
-            <p className="text-sm text-gray-600 mt-1">{currentUser?.name}</p>
+            <p className="text-sm text-gray-600 mt-1">{profile?.full_name}</p>
           )}
         </div>
 
@@ -286,20 +345,7 @@ const Profile = () => {
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             />
           ) : (
-            <p className="text-sm text-gray-600 mt-1">{currentUser?.email}</p>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="provider-phone">Phone</Label>
-          {isEditing ? (
-            <Input
-              id="provider-phone"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            />
-          ) : (
-            <p className="text-sm text-gray-600 mt-1">{(currentUser as any).phone || 'Not provided'}</p>
+            <p className="text-sm text-gray-600 mt-1">{profile?.email}</p>
           )}
         </div>
 
@@ -331,30 +377,16 @@ const Profile = () => {
         </div>
 
         <div>
-          <Label htmlFor="provider-neighborhood">Neighborhood/Suburb</Label>
-          {isEditing ? (
-            <Input
-              id="provider-neighborhood"
-              placeholder="e.g., Sandton, Sea Point"
-              value={formData.neighborhood || ''}
-              onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
-            />
-          ) : (
-            <p className="text-sm text-gray-600 mt-1">{formData.neighborhood || 'Not provided'}</p>
-          )}
-        </div>
-
-        <div>
           <Label htmlFor="provider-hourly-rate">Hourly Rate (R)</Label>
           {isEditing ? (
             <Input
               id="provider-hourly-rate"
               type="number"
-              value={formData.hourlyRate}
-              onChange={(e) => setFormData({ ...formData, hourlyRate: parseFloat(e.target.value) })}
+              value={formData.hourly_rate}
+              onChange={(e) => setFormData({ ...formData, hourly_rate: parseFloat(e.target.value) })}
             />
           ) : (
-            <p className="text-sm text-gray-600 mt-1">R{formData.hourlyRate}/hour</p>
+            <p className="text-sm text-gray-600 mt-1">R{formData.hourly_rate}/hour</p>
           )}
         </div>
 
@@ -374,64 +406,6 @@ const Profile = () => {
             </div>
           )}
         </div>
-
-        <div>
-          <Label>Availability</Label>
-          <div className="mt-3 grid grid-cols-4 gap-2">
-            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-              <div key={day} className="flex items-center gap-2">
-                <Switch
-                  id={`day-${day}`}
-                  checked={formData.availability.days.includes(day)}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      setFormData({
-                        ...formData,
-                        availability: {
-                          ...formData.availability,
-                          days: [...formData.availability.days, day]
-                        }
-                      });
-                    } else {
-                      setFormData({
-                        ...formData,
-                        availability: {
-                          ...formData.availability,
-                          days: formData.availability.days.filter(d => d !== day)
-                        }
-                      });
-                    }
-                  }}
-                  disabled={!isEditing}
-                />
-                <Label htmlFor={`day-${day}`} className="text-sm">{day}</Label>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="start-time">Start Time</Label>
-            <Input
-              id="start-time"
-              type="time"
-              value={formData.availability.startTime}
-              onChange={(e) => setFormData({ ...formData, availability: { ...formData.availability, startTime: e.target.value } })}
-              disabled={!isEditing}
-            />
-          </div>
-          <div>
-            <Label htmlFor="end-time">End Time</Label>
-            <Input
-              id="end-time"
-              type="time"
-              value={formData.availability.endTime}
-              onChange={(e) => setFormData({ ...formData, availability: { ...formData.availability, endTime: e.target.value } })}
-              disabled={!isEditing}
-            />
-          </div>
-        </div>
       </div>
     </>
   );
@@ -444,11 +418,11 @@ const Profile = () => {
           {isEditing ? (
             <Input
               id="admin-name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              value={formData.full_name}
+              onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
             />
           ) : (
-            <p className="text-sm text-gray-600 mt-1">{currentUser?.name}</p>
+            <p className="text-sm text-gray-600 mt-1">{profile?.full_name}</p>
           )}
         </div>
 
@@ -462,34 +436,7 @@ const Profile = () => {
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             />
           ) : (
-            <p className="text-sm text-gray-600 mt-1">{currentUser?.email}</p>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="admin-phone">Phone</Label>
-          {isEditing ? (
-            <Input
-              id="admin-phone"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            />
-          ) : (
-            <p className="text-sm text-gray-600 mt-1">{(currentUser as any).phone || 'Not provided'}</p>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="admin-neighborhood">Neighborhood/Suburb</Label>
-          {isEditing ? (
-            <Input
-              id="admin-neighborhood"
-              placeholder="e.g., Sandton, Sea Point"
-              value={formData.neighborhood || ''}
-              onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
-            />
-          ) : (
-            <p className="text-sm text-gray-600 mt-1">{formData.neighborhood || 'Not provided'}</p>
+            <p className="text-sm text-gray-600 mt-1">{profile?.email}</p>
           )}
         </div>
 
@@ -503,13 +450,15 @@ const Profile = () => {
   );
 
   const getDashboardRoute = () => {
-    switch (currentUser?.role) {
+    switch (profile?.role) {
       case 'admin': return '/admin';
       case 'provider': return '/provider';
       case 'client': return '/client';
       default: return '/';
     }
   };
+
+  const averageRating = calculateAverageRating();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -560,13 +509,13 @@ const Profile = () => {
                 <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
                   <User className="w-10 h-10 text-white" />
                 </div>
-                <CardTitle className="text-center">{currentUser?.name}</CardTitle>
+                <CardTitle className="text-center">{profile?.full_name}</CardTitle>
                 <CardDescription className="text-center">
                   <Badge variant={
-                    currentUser?.role === 'admin' ? 'default' : 
-                    currentUser?.role === 'provider' ? 'secondary' : 'outline'
+                    profile?.role === 'admin' ? 'default' : 
+                    profile?.role === 'provider' ? 'secondary' : 'outline'
                   }>
-                    {currentUser?.role?.toUpperCase()}
+                    {profile?.role?.toUpperCase()}
                   </Badge>
                 </CardDescription>
               </CardHeader>
@@ -574,38 +523,32 @@ const Profile = () => {
                 <div className="flex items-center gap-3 text-sm">
                   <Calendar className="w-4 h-4 text-gray-500" />
                   <span className="text-gray-600">
-                    Member since {currentUser?.createdAt ? new Date(currentUser.createdAt).toLocaleDateString() : 'N/A'}
+                    Member since {profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : 'N/A'}
                   </span>
                 </div>
-                {(currentUser as any).phone && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <Phone className="w-4 h-4 text-gray-500" />
-                    <span className="text-gray-600">{(currentUser as any).phone}</span>
-                  </div>
-                )}
-                {(currentUser as any).location?.address && (
+                {profile?.location?.address && (
                   <div className="flex items-center gap-3 text-sm">
                     <MapPin className="w-4 h-4 text-gray-500" />
-                    <span className="text-gray-600">{(currentUser as any).location.address}</span>
+                    <span className="text-gray-600">{profile.location.address}</span>
                   </div>
                 )}
-                {currentUser?.role === 'provider' && (
+                {profile?.role === 'provider' && (
                   <>
                     <div className="flex items-center gap-3 text-sm pt-4 border-t">
                       <Star className="w-4 h-4 text-amber-500" />
-                      <span className="text-gray-600 font-medium">{formData.avg_rating || formData.rating} Rating</span>
+                      <span className="text-gray-600 font-medium">{profile.avg_rating?.toFixed(1)} Rating</span>
                     </div>
                     <div className="flex items-center gap-3 text-sm">
-                      <Dog className="w-4 h-4 text-blue-500" />
-                      <span className="text-gray-600">{formData.review_count || formData.totalWalks} Reviews</span>
+                      <DogIcon className="w-4 h-4 text-blue-500" />
+                      <span className="text-gray-600">{profile.review_count} Reviews</span>
                     </div>
                     <div className="flex items-center gap-3 text-sm">
                       <DollarSign className="w-4 h-4 text-green-500" />
-                      <span className="text-gray-600">R{formData.hourlyRate}/hour</span>
+                      <span className="text-gray-600">R{profile.hourly_rate}/hour</span>
                     </div>
                     <div className="flex items-center gap-3 text-sm">
                       <Shield className="w-4 h-4 text-purple-500" />
-                      <span className="text-gray-600">{formData.availableCredits} Credits Available</span>
+                      <span className="text-gray-600">{profile.credit_balance} Credits Available</span>
                     </div>
                   </>
                 )}
@@ -635,9 +578,9 @@ const Profile = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                {currentUser?.role === 'client' && renderClientProfile()}
-                {currentUser?.role === 'provider' && renderProviderProfile()}
-                {currentUser?.role === 'admin' && renderAdminProfile()}
+                {profile?.role === 'client' && renderClientProfile()}
+                {profile?.role === 'provider' && renderProviderProfile()}
+                {profile?.role === 'admin' && renderAdminProfile()}
               </CardContent>
             </Card>
 
@@ -653,7 +596,7 @@ const Profile = () => {
                     <div>
                       <p className="font-medium">Account Status</p>
                       <p className="text-sm text-gray-600">
-                        {currentUser?.isApproved ? (
+                        {profile?.is_approved ? (
                           <span className="text-green-600">Active and Approved</span>
                         ) : (
                           <span className="text-amber-600">Pending Approval</span>
@@ -661,7 +604,7 @@ const Profile = () => {
                       </p>
                     </div>
                   </div>
-                  {currentUser?.isSuspended && (
+                  {profile?.is_suspended && (
                     <Badge variant="destructive">Suspended</Badge>
                   )}
                 </div>
@@ -671,45 +614,46 @@ const Profile = () => {
         </div>
 
         {/* Reviews Card */}
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Reviews</CardTitle>
-            <CardDescription>What others say about you</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {myReviews.length === 0 ? (
-              <div className="text-center py-12 bg-gray-50 rounded-lg">
-                <Star className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                <p className="text-gray-600">No reviews yet</p>
-                <p className="text-sm text-gray-500 mt-1">Complete bookings to receive reviews from others</p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {/* Rating Summary */}
-                <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star
-                        key={star}
-                        className={`w-6 h-6 ${
-                          star <= Math.round(averageRating)
-                            ? 'fill-amber-500 text-amber-500'
-                            : 'text-gray-300'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-gray-900">{averageRating.toFixed(1)}</p>
-                    <p className="text-sm text-gray-600">{myReviews.length} review{myReviews.length !== 1 ? 's' : ''}</p>
-                  </div>
+        {profile?.role === 'provider' && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Reviews</CardTitle>
+              <CardDescription>What others say about you</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingReviews ? (
+                <div className="text-center py-8 text-gray-500">Loading reviews...</div>
+              ) : reviews.length === 0 ? (
+                <div className="text-center py-12 bg-gray-50 rounded-lg">
+                  <Star className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600">No reviews yet</p>
+                  <p className="text-sm text-gray-500 mt-1">Complete bookings to receive reviews from others</p>
                 </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Rating Summary */}
+                  <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          className={`w-6 h-6 ${
+                            star <= Math.round(averageRating)
+                              ? 'fill-amber-500 text-amber-500'
+                              : 'text-gray-300'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-gray-900">{averageRating.toFixed(1)}</p>
+                      <p className="text-sm text-gray-600">{reviews.length} review{reviews.length !== 1 ? 's' : ''}</p>
+                    </div>
+                  </div>
 
-                {/* Reviews List */}
-                <div className="space-y-4">
-                  {myReviews.map((review) => {
-                    const reviewer = users.find(u => u.id === review.fromUserId);
-                    return (
+                  {/* Reviews List */}
+                  <div className="space-y-4">
+                    {reviews.map((review) => (
                       <div key={review.id} className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center gap-3">
@@ -717,9 +661,9 @@ const Profile = () => {
                               <User className="w-5 h-5 text-white" />
                             </div>
                             <div>
-                              <p className="font-semibold text-gray-900">{reviewer?.name || 'Anonymous'}</p>
+                              <p className="font-semibold text-gray-900">Client</p>
                               <p className="text-xs text-gray-500">
-                                {review.createdAt ? new Date(review.createdAt).toLocaleDateString() : 'N/A'}
+                                {review.created_at ? new Date(review.created_at).toLocaleDateString() : 'N/A'}
                               </p>
                             </div>
                           </div>
@@ -740,13 +684,13 @@ const Profile = () => {
                           <p className="text-gray-700 text-sm leading-relaxed">{review.comment}</p>
                         )}
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Add Dog Modal */}
@@ -807,8 +751,8 @@ const Profile = () => {
                 <Input
                   id="dog-notes"
                   placeholder="e.g., Needs longer walks, food allergies, etc."
-                  value={newDog.notes}
-                  onChange={(e) => setNewDog({ ...newDog, notes: e.target.value })}
+                  value={newDog.special_instructions}
+                  onChange={(e) => setNewDog({ ...newDog, special_instructions: e.target.value })}
                 />
               </div>
               <div className="flex gap-4 pt-4">
@@ -816,7 +760,7 @@ const Profile = () => {
                   variant="outline"
                   onClick={() => {
                     setShowAddDogModal(false);
-                    setNewDog({ name: '', breed: '', age: 0, weight: 0, notes: '' });
+                    setNewDog({ name: '', breed: '', age: 0, weight: 0, special_instructions: '' });
                   }}
                   className="flex-1 text-green-700 border-green-300 hover:bg-green-50"
                 >
