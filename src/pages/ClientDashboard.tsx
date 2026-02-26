@@ -525,8 +525,10 @@ const ClientDashboard = () => {
                               <CardTitle className="text-lg">{provider.full_name}</CardTitle>
                               <CardDescription>
                                 {provider.location?.address}
-                                {distance && <Badge variant="outline" className="ml-2">{distance} km</Badge>}
                               </CardDescription>
+                              {distance && (
+                                <Badge variant="outline" className="ml-0 mt-1">{distance} km</Badge>
+                              )}
                               {provider.bio && (
                                 <p className="text-sm text-gray-600 mt-2 line-clamp-2">{provider.bio}</p>
                               )}
