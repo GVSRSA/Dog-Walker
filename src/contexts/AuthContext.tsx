@@ -92,7 +92,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (data.user) {
         // Create profile in database with all required fields
-        // Note: created_at is handled automatically by the database DEFAULT constraint
+        // Note: created_at, updated_at, credit_balance, avg_rating, review_count, is_suspended are handled automatically by database DEFAULT constraints
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .insert({
@@ -100,14 +100,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             email,
             full_name: fullName,
             role,
-            is_approved: false,
-            is_suspended: false,
           })
           .select('*')
           .single();
 
         if (profileError) {
-          throw profileError;
+          // Show detailed error message if profile creation fails
+          throw new Error(`Profile creation failed: ${profileError.message}`);
         }
 
         // Set current user state
