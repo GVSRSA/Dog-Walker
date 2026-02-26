@@ -34,6 +34,14 @@ const resolved = resolveEnv();
 const SUPABASE_URL = resolved.url || "https://ixdalvgvnrkucwgkgyih.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = resolved.key || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4ZGFsdmd2bnJrdWN3Z2tneWloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwOTIzNTUsImV4cCI6MjA4NzY2ODM1NX0.6fhAp9dYuLUpd9tHo2g8gHddv59_gDneJkU3bNZBTUA";
 
+// Debug: Log Supabase configuration
+console.log('[Supabase Client] Initializing with URL:', SUPABASE_URL);
+console.log('[Supabase Client] Environment variables resolved:', {
+  hasEnvUrl: !!resolved.url,
+  hasEnvKey: !!resolved.key,
+  isUsingDefaults: !resolved.url && !resolved.key
+});
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 

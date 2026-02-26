@@ -19,20 +19,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const initUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      console.log('[AuthContext] Initializing user session...');
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (error) {
+        console.error('[AuthContext] Error getting user:', error);
+        return;
+      }
       
       if (user) {
+        console.log('[AuthContext] User found:', { id: user.id, email: user.email });
         // Fetch profile from database
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single();
         
+        if (profileError) {
+          console.error('[AuthContext] Error fetching profile:', profileError);
+          return;
+        }
+        
         if (profile) {
+          console.log('[AuthContext] Profile loaded:', { id: profile.id, role: profile.role });
           setCurrentUser(profile);
           setIsAuthenticated(true);
         }
+      } else {
+        console.log('[AuthContext] No user session found');
       }
     };
     
