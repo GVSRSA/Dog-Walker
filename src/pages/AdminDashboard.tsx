@@ -25,33 +25,33 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'bookings' | 'safety'>('users');
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  const fetchUsers = async () => {
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching profiles:', error);
+        setFetchError(`Supabase Error: ${error.message} (Code: ${error.code})`);
+      } else {
+        setProfiles(data || []);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      console.error('Error:', err);
+      setFetchError(`Unexpected Error: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Fetch all profiles
   useEffect(() => {
-    const fetchAllProfiles = async () => {
-      setLoading(true);
-      setFetchError(null);
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .order('created_at', { ascending: false });
-        
-        if (error) {
-          console.error('Error fetching profiles:', error);
-          setFetchError(`Supabase Error: ${error.message} (Code: ${error.code})`);
-        } else {
-          setProfiles(data || []);
-        }
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        console.error('Error:', err);
-        setFetchError(`Unexpected Error: ${errorMessage}`);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAllProfiles();
+    fetchUsers();
   }, []);
 
   // Fetch all bookings
@@ -108,28 +108,40 @@ useEffect(() => {
 
   const handleApprove = async (userId: string) => {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ is_approved: true })
-        .eq('id', userId);
+      const { error } = await supabase.rpc('admin_approve_user', {
+        target_id: userId,
+        status: true,
+      });
 
       if (error) {
         console.error('Error approving user:', error);
         alert('Failed to approve user');
-      } else {
-        // Refresh profiles
-        const { data, error: fetchError } = await supabase
-          .from('profiles')
-          .select('*')
-          .order('created_at', { ascending: false });
-        
-        if (!fetchError) {
-          setProfiles(data || []);
-        }
+        return;
       }
+
+      await fetchUsers();
     } catch (err) {
       console.error('Error:', err);
       alert('Failed to approve user');
+    }
+  };
+
+  const handleHardDelete = async (userId: string) => {
+    try {
+      const { error } = await supabase.rpc('admin_hard_delete_user', {
+        target_id: userId,
+      });
+
+      if (error) {
+        console.error('Error deleting user:', error);
+        alert('Failed to delete user');
+        return;
+      }
+
+      await fetchUsers();
+    } catch (err) {
+      console.error('Error:', err);
+      alert('Failed to delete user');
     }
   };
 
@@ -144,15 +156,7 @@ useEffect(() => {
         console.error('Error suspending user:', error);
         alert('Failed to suspend user');
       } else {
-        // Refresh profiles
-        const { data, error: fetchError } = await supabase
-          .from('profiles')
-          .select('*')
-          .order('created_at', { ascending: false });
-        
-        if (!fetchError) {
-          setProfiles(data || []);
-        }
+        await fetchUsers();
       }
     } catch (err) {
       console.error('Error:', err);
@@ -196,12 +200,6 @@ useEffect(() => {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Link to="/provider" className="text-sm text-green-700 hover:underline">
-              Provider Dashboard
-            </Link>
-            <Link to="/client" className="text-sm text-green-700 hover:underline">
-              Client Dashboard
-            </Link>
             <Link to="/profile">
               <Button variant="ghost" size="icon">
                 <User className="w-4 h-4" />
@@ -330,10 +328,10 @@ useEffect(() => {
                             <Button
                               size="sm"
                               variant="destructive"
-                              onClick={() => handleSuspend(provider.id)}
+                              onClick={() => handleHardDelete(provider.id)}
                             >
                               <XCircle className="w-4 h-4 mr-1" />
-                              Reject
+                              Delete
                             </Button>
                           </div>
                         </div>
@@ -405,24 +403,36 @@ useEffect(() => {
                           </div>
                         </TableCell>
                         <TableCell>
-                          {profile.role === 'provider' && !profile.is_approved && (
-                            <Button
-                              size="sm"
-                              onClick={() => handleApprove(profile.id)}
-                              className="bg-green-700 hover:bg-green-800"
-                            >
-                              Approve
-                            </Button>
-                          )}
-                          {profile.is_approved && !profile.is_suspended && profile.role !== 'admin' && (
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleSuspend(profile.id)}
-                            >
-                              Suspend
-                            </Button>
-                          )}
+                          <div className="flex flex-wrap gap-2">
+                            {profile.role === 'provider' && !profile.is_approved && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleApprove(profile.id)}
+                                className="bg-green-700 hover:bg-green-800"
+                              >
+                                Approve
+                              </Button>
+                            )}
+                            {profile.is_approved && !profile.is_suspended && profile.role !== 'admin' && (
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleSuspend(profile.id)}
+                              >
+                                Suspend
+                              </Button>
+                            )}
+                            {profile.role !== 'admin' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleHardDelete(profile.id)}
+                                className="border-red-200 text-red-700 hover:bg-red-50"
+                              >
+                                Delete
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

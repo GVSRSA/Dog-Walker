@@ -23,33 +23,31 @@ const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode;
   const { currentUser, isAuthenticated } = useAuth();
   const location = useLocation();
 
-  // DISABLED: Not logged in redirect - let users stay on page to read console
-  // if (!currentUser || !isAuthenticated) {
-  //   return <Navigate to="/login" state={{ from: location }} replace />;
-  // }
+  // Require login
+  if (!currentUser || !isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
 
-  // DISABLED: Logged in but not allowed for this route - let users stay on page
-  // if (!allowedRoles.includes(currentUser.role || '')) {
-  //   // Redirect to appropriate dashboard based on role
-  //   const redirectTo = 
-  //     currentUser.role === 'admin' ? '/admin' :
-  //     currentUser.role === 'provider' ? '/provider' :
-  //     currentUser.role === 'client' ? '/client' : '/login';
-  //   
-  //   return <Navigate to={redirectTo} replace />;
-  // }
+  // Enforce role access
+  if (!allowedRoles.includes(currentUser.role || '')) {
+    const redirectTo =
+      currentUser.role === 'admin' ? '/admin' :
+      currentUser.role === 'provider' ? '/provider' :
+      currentUser.role === 'client' ? '/client' : '/login';
+
+    return <Navigate to={redirectTo} replace />;
+  }
 
   return <>{children}</>;
 };
 
 const ProfileCompletionGuard = ({ children }: { children: React.ReactNode }) => {
-  const { needsProfileCompletion, isAuthenticated } = useAuth();
+  const { needsProfileCompletion } = useAuth();
   const location = useLocation();
 
-  // DISABLED: Profile completion redirect - let users stay on page to read console
-  // if (needsProfileCompletion && location.pathname !== '/complete-profile') {
-  //   return <Navigate to="/complete-profile" replace state={{ from: location }} />;
-  // }
+  if (needsProfileCompletion && location.pathname !== '/complete-profile') {
+    return <Navigate to="/complete-profile" replace state={{ from: location }} />;
+  }
 
   return <>{children}</>;
 };
@@ -59,15 +57,11 @@ const AuthRedirectHandler = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // DISABLED: Landing page redirect - let users stay on page to read console
-    // if (needsRedirectToLanding) {
-    //   console.log('[AuthRedirectHandler] Redirecting to landing page due to invalid session');
-    //   // Perform logout and navigate once
-    //   logout();
-    //   navigate('/', { replace: true });
-    //   // Clear the flag to prevent continuous redirects
-    //   clearRedirectFlag();
-    // }
+    if (needsRedirectToLanding) {
+      logout();
+      navigate('/', { replace: true });
+      clearRedirectFlag();
+    }
   }, [needsRedirectToLanding, navigate, logout, clearRedirectFlag]);
 
   return null;
