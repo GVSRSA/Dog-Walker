@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from '@/components/ui/use-toast';
 import RoleNavbar from '@/components/RoleNavbar';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,6 +36,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'users' | 'dogs' | 'bookings'>('users');
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [updatingRoleUserId, setUpdatingRoleUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -83,6 +86,42 @@ const AdminDashboard = () => {
       console.error('Error:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpdateUserRole = async (userId: string, newRole: Profile['role']) => {
+    setUpdatingRoleUserId(userId);
+    try {
+      const { error } = await supabase.rpc('update_user_role', {
+        target_id: userId,
+        new_role: newRole,
+      });
+
+      if (error) {
+        console.error('Error updating user role:', error);
+        toast({
+          title: 'Role update failed',
+          description: error.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      await fetchUsers();
+
+      toast({
+        title: 'Role updated',
+        description: 'Role updated. The user may need to log out and back in to see their new dashboard.',
+      });
+    } catch (err) {
+      console.error('Error updating user role:', err);
+      toast({
+        title: 'Role update failed',
+        description: 'Unexpected error updating role.',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingRoleUserId(null);
     }
   };
 
@@ -370,17 +409,20 @@ const AdminDashboard = () => {
                           <TableCell className="font-medium">{profile.full_name}</TableCell>
                           <TableCell>{profile.email}</TableCell>
                           <TableCell>
-                            <Badge
-                              variant={
-                                profile.role === 'admin'
-                                  ? 'default'
-                                  : profile.role === 'provider'
-                                    ? 'secondary'
-                                    : 'outline'
-                              }
+                            <Select
+                              value={profile.role}
+                              onValueChange={(v) => handleUpdateUserRole(profile.id, v as Profile['role'])}
+                              disabled={updatingRoleUserId === profile.id}
                             >
-                              {profile.role}
-                            </Badge>
+                              <SelectTrigger className="h-9 w-[160px] rounded-full bg-white">
+                                <SelectValue placeholder="Select role" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="client">Client</SelectItem>
+                                <SelectItem value="provider">Provider</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-2">
