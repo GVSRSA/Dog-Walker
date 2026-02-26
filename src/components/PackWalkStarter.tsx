@@ -28,10 +28,16 @@ function isToday(value?: string | null) {
   );
 }
 
-export default function PackWalkStarter({ providerId, bookings, onCreated }: {
+export default function PackWalkStarter({
+  providerId,
+  bookings,
+  onCreated,
+  onStarted,
+}: {
   providerId: string;
   bookings: Booking[];
   onCreated: () => Promise<void> | void;
+  onStarted?: (sessionId: string) => void;
 }) {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [creating, setCreating] = useState(false);
@@ -91,6 +97,7 @@ export default function PackWalkStarter({ providerId, bookings, onCreated }: {
 
       setSelected({});
       await onCreated();
+      onStarted?.(sessionId);
     } catch (e: any) {
       toast({
         title: 'Could not start pack walk',

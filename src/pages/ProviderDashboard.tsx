@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import RoleNavbar from '@/components/RoleNavbar';
 import PackWalkStarter from '@/components/PackWalkStarter';
@@ -64,6 +64,7 @@ const ProviderDashboard = () => {
   const [trackingInterval, setTrackingInterval] = useState<NodeJS.Timeout | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [ratingBooking, setRatingBooking] = useState<Booking | null>(null);
+  const [dogNamesById, setDogNamesById] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const hash = location.hash.replace('#', '');
@@ -81,6 +82,47 @@ const ProviderDashboard = () => {
     }
     setBookings(data || []);
   }
+
+  useEffect(() => {
+    const dogIds = Array.from(
+      new Set(
+        (bookings || [])
+          .map((b) => b.dog_id)
+          .filter((id): id is string => Boolean(id))
+      )
+    );
+
+    if (dogIds.length === 0) return;
+
+    let cancelled = false;
+
+    const loadDogNames = async () => {
+      const { data, error } = await supabase.from('dogs').select('id,name').in('id', dogIds);
+      if (cancelled) return;
+      if (error) {
+        console.error('[provider-dashboard] Error loading dogs:', error);
+        return;
+      }
+      const map: Record<string, string> = {};
+      (data || []).forEach((d: any) => {
+        if (d?.id) map[d.id] = d?.name || 'Dog';
+      });
+      setDogNamesById(map);
+    };
+
+    loadDogNames();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bookings]);
+
+  const dogLabel = useMemo(() => {
+    return (dogId?: string | null) => {
+      if (!dogId) return 'Dog';
+      return dogNamesById[dogId] || 'Dog';
+    };
+  }, [dogNamesById]);
 
   // Fetch bookings for provider
   useEffect(() => {
@@ -373,12 +415,12 @@ const ProviderDashboard = () => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Hourly Rate</CardTitle>
+                <CardTitle className="text-sm font-medium">Walk Rate</CardTitle>
                 <DollarSign className="h-4 w-4 text-blue-700" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">R{provider?.hourly_rate || 0}</div>
-                <p className="text-xs text-gray-600">per hour</p>
+                <div className="text-2xl font-bold">R{provider?.walk_rate || 0}</div>
+                <p className="text-xs text-gray-600">per walk</p>
               </CardContent>
             </Card>
 
@@ -398,7 +440,12 @@ const ProviderDashboard = () => {
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Bookings Section */}
           <section id="walks" className="scroll-mt-24 lg:col-span-2 space-y-6">
-            <PackWalkStarter providerId={currentUser.id} bookings={bookings} onCreated={refreshBookings} />
+            <PackWalkStarter
+              providerId={currentUser.id}
+              bookings={bookings}
+              onCreated={refreshBookings}
+              onStarted={(sessionId) => navigate(`/live-walk/${sessionId}`)}
+            />
 
             {/* New Requests */}
             <Card>
@@ -419,7 +466,7 @@ const ProviderDashboard = () => {
                     {pendingBookings.map((booking) => (
                       <div key={booking.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                         <div>
-                          <p className="font-semibold">Client ID: {booking.client_id.slice(0, 8)}...</p>
+                          <p className="font-semibold">{dogLabel(booking.dog_id)}</p>
                           <p className="text-sm text-gray-600">
                             {booking.scheduled_at && format(new Date(booking.scheduled_at), 'PPP')} at{' '}
                             {booking.scheduled_at && format(new Date(booking.scheduled_at), 'HH:mm')}
@@ -448,30 +495,28 @@ const ProviderDashboard = () => {
               <Card className="border-green-300 bg-green-50">
                 <CardHeader>
                   <CardTitle className="text-green-900">Daily Schedule</CardTitle>
-                  <CardDescription>Today's confirmed bookings (these appear in the Pack Walk selector above).</CardDescription>
+                  <CardDescription>Today's confirmed bookings (start them via the Pack Walk selector above).</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     {todaysConfirmedBookings.map((booking) => (
                       <div key={booking.id} className="flex items-center justify-between p-4 bg-white rounded-lg">
-                        <div>
-                          <p className="font-semibold">Client ID: {booking.client_id.slice(0, 8)}...</p>
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-slate-900">{dogLabel(booking.dog_id)}</p>
                           <p className="text-sm text-gray-600">
-                            {booking.scheduled_at && format(new Date(booking.scheduled_at), 'PPP')} at{' '}
-                            {booking.scheduled_at && format(new Date(booking.scheduled_at), 'HH:mm')}
+                            {booking.scheduled_at ? (
+                              <>
+                                {format(new Date(booking.scheduled_at), 'PPP')} at {format(new Date(booking.scheduled_at), 'HH:mm')}
+                              </>
+                            ) : (
+                              booking.scheduled_date
+                            )}
                           </p>
+                          <p className="mt-1 text-xs font-semibold text-slate-500">Booking {booking.id.slice(0, 8)}…</p>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3">
+                          <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">Confirmed</Badge>
                           <p className="font-bold text-green-700">R{booking.total_fee?.toFixed(2) || 'N/A'}</p>
-                          <Button
-                            size="sm"
-                            onClick={() => handleStartWalk(booking.id)}
-                            disabled={isWalking}
-                            className="bg-green-700 hover:bg-green-800"
-                          >
-                            <Play className="w-4 h-4 mr-1" />
-                            Start Walk
-                          </Button>
                         </div>
                       </div>
                     ))}
@@ -492,7 +537,7 @@ const ProviderDashboard = () => {
                     {inProgressBookings.map((booking) => (
                       <div key={booking.id} className="flex items-center justify-between p-4 bg-white rounded-lg">
                         <div>
-                          <p className="font-semibold">Client ID: {booking.client_id?.slice(0, 8)}...</p>
+                          <p className="font-semibold">{dogLabel(booking.dog_id)}</p>
                           <p className="text-sm text-gray-600">Session: {booking.walk_session_id?.slice(0, 8)}...</p>
                         </div>
                         <div className="flex items-center gap-3">
@@ -536,7 +581,7 @@ const ProviderDashboard = () => {
                   {activeBookings.map((booking) => (
                     <div key={booking.id} className="flex items-center justify-between">
                       <div>
-                        <p className="font-semibold">Walking for client {booking.client_id.slice(0, 8)}...</p>
+                        <p className="font-semibold">Walking {dogLabel(booking.dog_id)}</p>
                         <p className="text-sm text-gray-600">Tracking location...</p>
                       </div>
                       <Button size="sm" onClick={() => handleEndWalk(booking.id)} className="bg-red-600 hover:bg-red-700">
@@ -567,7 +612,7 @@ const ProviderDashboard = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Client</TableHead>
+                        <TableHead>Dog</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead>Duration</TableHead>
                         <TableHead>Earnings</TableHead>
@@ -578,7 +623,7 @@ const ProviderDashboard = () => {
                     <TableBody>
                       {[...completedBookings, ...bookings.filter((b) => b.status === 'cancelled')].map((booking) => (
                         <TableRow key={booking.id}>
-                          <TableCell className="font-medium">ID: {booking.client_id?.slice(0, 8)}...</TableCell>
+                          <TableCell className="font-medium">{dogLabel(booking.dog_id)}</TableCell>
                           <TableCell>{booking.scheduled_at && format(new Date(booking.scheduled_at), 'PPP')}</TableCell>
                           <TableCell>-</TableCell>
                           <TableCell>R{booking.provider_payout?.toFixed(2) || '0.00'}</TableCell>
