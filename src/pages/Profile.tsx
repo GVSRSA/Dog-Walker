@@ -289,7 +289,7 @@ const Profile = () => {
 
         <div className="pt-4 border-t">
           <div className="flex items-center justify-between mb-4">
-            <Label className="text-base font-semibold">My Dogs</Label>
+            <h3 className="text-base font-semibold">My Dogs</h3>
             <Button
               size="sm"
               onClick={() => setShowAddDogModal(true)}
@@ -421,9 +421,10 @@ const Profile = () => {
         </div>
 
         <div>
-          <Label>Services</Label>
+          <Label htmlFor="provider-services">Services</Label>
           {isEditing ? (
             <Input
+              id="provider-services"
               placeholder="Comma-separated services (e.g., Walking, Pet Sitting)"
               value={formData.services.join(', ')}
               onChange={(e) => setFormData({ ...formData, services: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}

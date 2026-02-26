@@ -342,7 +342,9 @@ const Register = () => {
               <Label htmlFor="fullName">Full Name</Label>
               <Input
                 id="fullName"
+                name="fullName"
                 type="text"
+                autoComplete="name"
                 placeholder="John Doe"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
@@ -354,7 +356,9 @@ const Register = () => {
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
+                name="email"
                 type="email"
+                autoComplete="email"
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -366,7 +370,9 @@ const Register = () => {
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
+                name="password"
                 type="password"
+                autoComplete="new-password"
                 placeholder="•••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -378,7 +384,9 @@ const Register = () => {
               <Label htmlFor="confirmPassword">Confirm Password</Label>
               <Input
                 id="confirmPassword"
+                name="confirmPassword"
                 type="password"
+                autoComplete="new-password"
                 placeholder="•••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}

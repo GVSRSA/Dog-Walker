@@ -554,24 +554,24 @@ const ProviderDashboard = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label>Name</Label>
-                  <Input value={provider?.full_name || ''} disabled />
+                  <Label htmlFor="provider-profile-name">Name</Label>
+                  <Input id="provider-profile-name" value={provider?.full_name || ''} disabled />
                 </div>
                 <div>
-                  <Label>Email</Label>
-                  <Input value={provider?.email || ''} disabled />
+                  <Label htmlFor="provider-profile-email">Email</Label>
+                  <Input id="provider-profile-email" value={provider?.email || ''} disabled />
                 </div>
                 <div>
-                  <Label>Bio</Label>
-                  <Input value={provider?.bio || ''} placeholder="Tell clients about yourself" />
+                  <Label htmlFor="provider-profile-bio">Bio</Label>
+                  <Input id="provider-profile-bio" value={provider?.bio || ''} placeholder="Tell clients about yourself" />
                 </div>
                 <div>
-                  <Label>Location</Label>
-                  <Input value={provider?.location?.address || ''} placeholder="Your service area" />
+                  <Label htmlFor="provider-profile-location">Location</Label>
+                  <Input id="provider-profile-location" value={provider?.location?.address || ''} placeholder="Your service area" />
                 </div>
                 <div>
-                  <Label>Hourly Rate (R)</Label>
-                  <Input type="number" value={provider?.hourly_rate || 0} />
+                  <Label htmlFor="provider-profile-rate">Hourly Rate (R)</Label>
+                  <Input id="provider-profile-rate" type="number" value={provider?.hourly_rate || 0} />
                 </div>
                 <Button className="w-full bg-green-700 hover:bg-green-800">
                   Update Profile
@@ -615,12 +615,12 @@ const ProviderDashboard = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label>Start Time</Label>
-                    <Input type="time" defaultValue="08:00" />
+                    <Label htmlFor="availability-start">Start Time</Label>
+                    <Input id="availability-start" name="availability-start" type="time" defaultValue="08:00" />
                   </div>
                   <div>
-                    <Label>End Time</Label>
-                    <Input type="time" defaultValue="18:00" />
+                    <Label htmlFor="availability-end">End Time</Label>
+                    <Input id="availability-end" name="availability-end" type="time" defaultValue="18:00" />
                   </div>
                 </div>
               </CardContent>

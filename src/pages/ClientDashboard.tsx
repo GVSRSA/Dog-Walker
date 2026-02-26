@@ -667,9 +667,9 @@ const ClientDashboard = () => {
                               </DialogHeader>
                               <div className="space-y-4">
                                 <div>
-                                  <Label>Select Dog</Label>
+                                  <Label htmlFor="select-dog">Select Dog</Label>
                                   <Select value={selectedDog} onValueChange={setSelectedDog}>
-                                    <SelectTrigger>
+                                    <SelectTrigger id="select-dog">
                                       <SelectValue placeholder="Choose a dog" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -682,8 +682,9 @@ const ClientDashboard = () => {
                                   </Select>
                                 </div>
                                 <div>
-                                  <Label>Date</Label>
+                                  <Label htmlFor="booking-date">Date</Label>
                                   <Input
+                                    id="booking-date"
                                     type="date"
                                     value={selectedDate}
                                     onChange={(e) => setSelectedDate(e.target.value)}
@@ -691,17 +692,18 @@ const ClientDashboard = () => {
                                   />
                                 </div>
                                 <div>
-                                  <Label>Time</Label>
+                                  <Label htmlFor="booking-time">Time</Label>
                                   <Input
+                                    id="booking-time"
                                     type="time"
                                     value={selectedTime}
                                     onChange={(e) => setSelectedTime(e.target.value)}
                                   />
                                 </div>
                                 <div>
-                                  <Label>Duration</Label>
+                                  <Label htmlFor="booking-duration">Duration</Label>
                                   <Select value={selectedDuration} onValueChange={setSelectedDuration}>
-                                    <SelectTrigger>
+                                    <SelectTrigger id="booking-duration">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
