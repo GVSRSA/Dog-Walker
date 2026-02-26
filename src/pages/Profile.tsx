@@ -29,6 +29,7 @@ const Profile = () => {
   const [loadingDogs, setLoadingDogs] = useState(false);
   const [reviews, setReviews] = useState<any[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
+  const [addDogStatus, setAddDogStatus] = useState<'success' | 'error' | null>(null);
   
   const [newDog, setNewDog] = useState({
     name: '',
@@ -75,9 +76,9 @@ const Profile = () => {
     fetchUserDogs();
   }, [profile?.id]);
 
-  // Fetch reviews for current user
+  // Fetch reviews for current user (only for providers)
   useEffect(() => {
-    if (!profile?.id) return;
+    if (!profile?.id || profile.role !== 'provider') return;
 
     const fetchUserReviews = async () => {
       setLoadingReviews(true);
@@ -101,7 +102,7 @@ const Profile = () => {
     };
 
     fetchUserReviews();
-  }, [profile?.id]);
+  }, [profile?.id, profile?.role]);
 
   // Sync form data with current user
   useEffect(() => {
@@ -125,6 +126,8 @@ const Profile = () => {
   const handleAddDog = async () => {
     if (!newDog.name || !newDog.breed) return;
 
+    setAddDogStatus(null);
+
     try {
       const { error } = await supabase
         .from('dogs')
@@ -132,17 +135,19 @@ const Profile = () => {
           owner_id: profile!.id,
           name: newDog.name,
           breed: newDog.breed,
-          age: newDog.age || 0,
-          weight: newDog.weight || 0,
+          age: parseInt(newDog.age.toString(), 10) || 0,
+          weight: parseFloat(newDog.weight.toString()) || 0,
           special_instructions: newDog.special_instructions || '',
         });
 
       if (error) {
         console.error('Error adding dog:', error);
-        alert('Failed to add dog');
+        setAddDogStatus('error');
+        alert('Failed to add dog: ' + error.message);
       } else {
         setNewDog({ name: '', breed: '', age: 0, weight: 0, special_instructions: '' });
         setShowAddDogModal(false);
+        setAddDogStatus('success');
         
         // Refresh dogs
         const { data } = await supabase
@@ -151,9 +156,12 @@ const Profile = () => {
           .eq('owner_id', profile!.id)
           .order('created_at', { ascending: false });
         setDogs(data || []);
+        
+        alert('🐕 Dog added successfully!');
       }
     } catch (err) {
       console.error('Error:', err);
+      setAddDogStatus('error');
       alert('Failed to add dog');
     }
   };
@@ -500,6 +508,20 @@ const Profile = () => {
             <p className="text-red-800 font-medium">Failed to update profile. Please try again.</p>
           </div>
         )}
+        
+        {/* Add Dog Success Alert */}
+        {addDogStatus === 'success' && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-green-600" />
+            <p className="text-green-800 font-medium">🐕 Dog added successfully!</p>
+          </div>
+        )}
+        {addDogStatus === 'error' && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+            <XCircle className="w-5 h-5 text-red-600" />
+            <p className="text-red-800 font-medium">Failed to add dog. Please try again.</p>
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Left Sidebar - Summary */}
@@ -729,10 +751,10 @@ const Profile = () => {
                     id="dog-age"
                     type="number"
                     min="0"
-                    step="0.5"
+                    step="1"
                     placeholder="Age"
                     value={newDog.age || ''}
-                    onChange={(e) => setNewDog({ ...newDog, age: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => setNewDog({ ...newDog, age: parseInt(e.target.value, 10) || 0 })}
                   />
                 </div>
                 <div>
