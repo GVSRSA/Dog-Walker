@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import CompleteProfile from "./pages/CompleteProfile";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProviderDashboard from "./pages/ProviderDashboard";
 import ClientDashboard from "./pages/ClientDashboard";
@@ -41,6 +42,18 @@ const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode;
   return <>{children}</>;
 };
 
+const ProfileCompletionGuard = ({ children }: { children: React.ReactNode }) => {
+  const { needsProfileCompletion, isAuthenticated } = useAuth();
+  const location = useLocation();
+
+  // If user needs profile completion and is not already on the complete profile page
+  if (needsProfileCompletion && location.pathname !== '/complete-profile') {
+    return <Navigate to="/complete-profile" replace state={{ from: location }} />;
+  }
+
+  return <>{children}</>;
+};
+
 const AuthRedirectHandler = () => {
   const { needsRedirectToLanding, logout, clearRedirectFlag } = useAuth();
   const navigate = useNavigate();
@@ -63,54 +76,57 @@ const AppContent = () => {
   return (
     <>
       <AuthRedirectHandler />
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        
-        {/* Protected Routes - Admin Only */}
-        <Route 
-          path="/admin" 
-          element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AdminDashboard />
-            </ProtectedRoute>
-          } 
-        />
-        
-        {/* Protected Routes - Provider Only */}
-        <Route 
-          path="/provider" 
-          element={
-            <ProtectedRoute allowedRoles={['provider']}>
-              <ProviderDashboard />
-            </ProtectedRoute>
-          } 
-        />
-        
-        {/* Protected Routes - Client Only */}
-        <Route 
-          path="/client" 
-          element={
-            <ProtectedRoute allowedRoles={['client']}>
-              <ClientDashboard />
-            </ProtectedRoute>
-          } 
-        />
-        
-        {/* Protected Routes - Any Logged In User */}
-        <Route 
-          path="/profile" 
-          element={
-            <ProtectedRoute allowedRoles={['admin', 'provider', 'client']}>
-              <Profile />
-            </ProtectedRoute>
-          } 
-        />
-        
-        <Route path="/index" element={<Index />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <ProfileCompletionGuard>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/complete-profile" element={<CompleteProfile />} />
+          
+          {/* Protected Routes - Admin Only */}
+          <Route 
+            path="/admin" 
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Protected Routes - Provider Only */}
+          <Route 
+            path="/provider" 
+            element={
+              <ProtectedRoute allowedRoles={['provider']}>
+                <ProviderDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Protected Routes - Client Only */}
+          <Route 
+            path="/client" 
+            element={
+              <ProtectedRoute allowedRoles={['client']}>
+                <ClientDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Protected Routes - Any Logged In User */}
+          <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'provider', 'client']}>
+                <Profile />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route path="/index" element={<Index />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </ProfileCompletionGuard>
     </>
   );
 };

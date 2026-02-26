@@ -22,23 +22,30 @@ const Login = () => {
     setIsLoading(true);
 
     try {
+      console.log('[Login] Attempting login for:', email);
       const profile = await login(email, password);
       
       if (profile) {
-        // Redirect based on user role
+        console.log('[Login] Login successful, navigating to dashboard for role:', profile.role);
+        
+        // Clear loading state immediately
+        setIsLoading(false);
+        
+        // Navigate to appropriate dashboard immediately
         if (profile.role === 'admin') {
-          navigate('/admin');
+          navigate('/admin', { replace: true });
         } else if (profile.role === 'provider') {
-          navigate('/provider');
+          navigate('/provider', { replace: true });
         } else {
-          navigate('/client');
+          navigate('/client', { replace: true });
         }
       } else {
         setError('Login failed. Please check your credentials.');
+        setIsLoading(false);
       }
     } catch (err: any) {
+      console.error('[Login] Login error:', err);
       setError(err.message || 'Invalid email or password');
-    } finally {
       setIsLoading(false);
     }
   };

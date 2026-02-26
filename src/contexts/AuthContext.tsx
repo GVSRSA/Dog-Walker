@@ -12,6 +12,8 @@ interface AuthContextType {
   clearStaleSession: () => Promise<void>;
   clearRedirectFlag: () => void;
   needsRedirectToLanding: boolean;
+  needsProfileCompletion: boolean;
+  setNeedsProfileCompletion: (value: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,6 +22,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentUser, setCurrentUser] = useState<Profile | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [needsRedirectToLanding, setNeedsRedirectToLanding] = useState(false);
+  const [needsProfileCompletion, setNeedsProfileCompletion] = useState(false);
 
   useEffect(() => {
     const initUser = async () => {
@@ -40,18 +43,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (user) {
         console.log('[AuthContext] User found:', { id: user.id, email: user.email });
-        // Fetch profile from database
+        // Fetch profile from database - using explicit column selection to avoid 406 error
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('*')
+          .select('id, email, role, full_name, created_at, is_approved, is_suspended')
           .eq('id', user.id)
           .single();
         
         if (profileError) {
-          console.log('[AuthContext] Profile not found, treating as guest');
-          // Silently treat as guest, don't show errors
+          console.log('[AuthContext] Profile not found, user needs to complete profile');
+          // User exists in auth but not in profiles - show profile completion screen
           setCurrentUser(null);
           setIsAuthenticated(false);
+          setNeedsProfileCompletion(true);
           return;
         }
         
@@ -59,12 +63,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('[AuthContext] Profile loaded:', { id: profile.id, role: profile.role });
           setCurrentUser(profile);
           setIsAuthenticated(true);
+          setNeedsProfileCompletion(false);
         }
       } else {
         // No session - treat as guest (silent fail, no alerts)
         console.log('[AuthContext] No session found, treating as guest');
         setCurrentUser(null);
         setIsAuthenticated(false);
+        setNeedsProfileCompletion(false);
       }
     };
     
@@ -73,6 +79,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string): Promise<Profile | null> => {
     try {
+      console.log('[AuthContext] Starting login for:', email);
+      
       // Sign in with Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -80,27 +88,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
+        console.error('[AuthContext] Login failed:', error);
         throw error;
       }
 
+      console.log('[AuthContext] Auth successful for user:', data.user?.id);
+
       if (data.user) {
-        // Fetch profile from database
-        const { data: profile } = await supabase
+        // Fetch profile from database - using explicit column selection to avoid 406 error
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('*')
+          .select('id, email, role, full_name, created_at, is_approved, is_suspended')
           .eq('id', data.user.id)
           .single();
         
+        if (profileError) {
+          console.error('[AuthContext] Profile fetch failed:', profileError);
+          throw new Error('Profile not found. Please contact support.');
+        }
+        
         if (profile) {
+          console.log('[AuthContext] Profile loaded, updating auth state:', { id: profile.id, role: profile.role });
           setCurrentUser(profile);
           setIsAuthenticated(true);
+          setNeedsProfileCompletion(false);
           return profile;
         }
       }
 
       return null;
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('[AuthContext] Login error:', err);
       throw err;
     }
   };
@@ -140,7 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             full_name: fullName,
             role,
           })
-          .select('*')
+          .select('id, email, role, full_name, created_at, is_approved, is_suspended')
           .single();
 
         if (profileError) {
@@ -195,6 +213,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearStaleSession,
     clearRedirectFlag,
     needsRedirectToLanding,
+    needsProfileCompletion,
+    setNeedsProfileCompletion,
   };
 
   return (
