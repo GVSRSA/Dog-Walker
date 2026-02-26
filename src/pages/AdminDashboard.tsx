@@ -1,28 +1,30 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import Navigation from '@/components/Navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import type { Profile, Booking, Review } from '@/types';
 import { 
   DollarSign, Users, ShoppingCart, TrendingUp, 
-  CheckCircle, XCircle, LogOut, Shield, User, Star, Dog
+  CheckCircle, XCircle, Shield, User, Star, Dog
 } from 'lucide-react';
 import { format } from 'date-fns';
 
 const AdminDashboard = () => {
-  const { logout } = useAuth();
-  const navigate = useNavigate();
   const { currentUser } = useAuth();
+  const isAdmin = currentUser?.role === 'admin';
+  
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentTab = searchParams.get('tab') || 'overview';
   
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'bookings' | 'safety'>('overview');
 
   // Fetch all profiles
   useEffect(() => {
@@ -95,11 +97,6 @@ useEffect(() => {
 
     fetchAllReviews();
   }, []);
-
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
 
   const handleApprove = async (userId: string) => {
     try {
@@ -179,65 +176,42 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <Shield className="w-8 h-8 text-green-700" />
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">Dog Walker</h1>
-              <p className="text-sm text-green-700 font-medium">by Jolly Walker</p>
-              <p className="text-xs text-gray-600">Welcome, {currentUser?.full_name}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link to="/profile">
-              <Button variant="ghost" size="icon">
-                <User className="w-4 h-4" />
-              </Button>
-            </Link>
-            <Button variant="ghost" onClick={handleLogout}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
-
+      <Navigation />
+      
       <div className="container mx-auto px-4 py-8">
         {/* Tabs */}
         <div className="flex gap-2 mb-6">
           <Button
-            variant={activeTab === 'overview' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('overview')}
-            className={activeTab === 'overview' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
+            variant={currentTab === 'overview' ? 'default' : 'outline'}
+            onClick={() => setSearchParams({ tab: 'overview' })}
+            className={currentTab === 'overview' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
           >
             Overview
           </Button>
           <Button
-            variant={activeTab === 'users' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('users')}
-            className={activeTab === 'users' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
+            variant={currentTab === 'users' ? 'default' : 'outline'}
+            onClick={() => setSearchParams({ tab: 'users' })}
+            className={currentTab === 'users' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
           >
             Users ({pendingProviders.length > 0 && pendingProviders.length})
           </Button>
           <Button
-            variant={activeTab === 'bookings' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('bookings')}
-            className={activeTab === 'bookings' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
+            variant={currentTab === 'bookings' ? 'default' : 'outline'}
+            onClick={() => setSearchParams({ tab: 'bookings' })}
+            className={currentTab === 'bookings' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
           >
             Bookings
           </Button>
           <Button
-            variant={activeTab === 'safety' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('safety')}
-            className={activeTab === 'safety' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
+            variant={currentTab === 'safety' ? 'default' : 'outline'}
+            onClick={() => setSearchParams({ tab: 'safety' })}
+            className={currentTab === 'safety' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
           >
             Safety
           </Button>
         </div>
 
-        {activeTab === 'overview' && (
+        {currentTab === 'overview' && (
           <>
             {/* Stats Cards */}
             <div className="grid md:grid-cols-4 gap-6 mb-8">
@@ -335,7 +309,7 @@ useEffect(() => {
           </>
         )}
 
-        {activeTab === 'users' && (
+        {currentTab === 'users' && (
           <Card>
             <CardHeader>
               <CardTitle>All Users</CardTitle>
@@ -410,7 +384,7 @@ useEffect(() => {
           </Card>
         )}
 
-        {activeTab === 'bookings' && (
+        {currentTab === 'bookings' && (
           <Card>
             <CardHeader>
               <CardTitle>All Bookings</CardTitle>
@@ -466,7 +440,7 @@ useEffect(() => {
           </Card>
         )}
 
-        {activeTab === 'safety' && (
+        {currentTab === 'safety' && (
           <Card>
             <CardHeader>
               <CardTitle>Safety Dashboard</CardTitle>
