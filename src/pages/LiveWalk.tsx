@@ -11,8 +11,40 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import type { WalkBreadcrumb, WalkSession } from '@/types';
-import { MapPin, Navigation, Satellite, Square, Users, NotebookText, Droplets } from 'lucide-react';
+import { MapPin, Navigation, Satellite, Square, Users, NotebookText, Droplets, Crosshair } from 'lucide-react';
 import { format } from 'date-fns';
+
+const FALLBACK_CENTER = {
+  // Cape Town CBD (hardcoded fallback so the map is never a blank screen)
+  lat: -33.9249,
+  lng: 18.4241,
+};
+
+function parseProfileLocationToLatLng(value?: unknown): { lat: number; lng: number } | null {
+  if (!value) return null;
+
+  // Some apps store location as a JSON string. If we can parse lat/lng, use it.
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      const lat = Number((parsed as any)?.lat);
+      const lng = Number((parsed as any)?.lng);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+    } catch {
+      // ignore
+    }
+
+    // Simple "lat,lng" string
+    const m = value.match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
+    if (m) {
+      const lat = Number(m[1]);
+      const lng = Number(m[2]);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+    }
+  }
+
+  return null;
+}
 
 export default function LiveWalk() {
   const { bookingId } = useParams();
@@ -23,6 +55,7 @@ export default function LiveWalk() {
   const [session, setSession] = useState<WalkSession | null>(null);
   const [trail, setTrail] = useState<WalkBreadcrumb[]>([]);
   const [isSharing, setIsSharing] = useState(false);
+  const [pinging, setPinging] = useState(false);
 
   const [showSummary, setShowSummary] = useState(false);
   const [notes, setNotes] = useState('');
@@ -32,17 +65,37 @@ export default function LiveWalk() {
 
   const watchIdRef = useRef<number | null>(null);
   const insertCooldownRef = useRef<number>(0);
+  const permissionToastRef = useRef(false);
 
   const isProvider = currentUser?.role === 'provider';
   const isClient = currentUser?.role === 'client';
 
   const isCompleted = session?.status === 'completed';
 
+  const defaultCenter = useMemo(() => {
+    // If the profile contains a parsable lat/lng, center there; otherwise fallback to a city center.
+    const fromProfile = parseProfileLocationToLatLng((currentUser as any)?.location);
+    return fromProfile || FALLBACK_CENTER;
+  }, [currentUser]);
+
+  const mapCenter = useMemo(() => {
+    const lat = session?.current_lat;
+    const lng = session?.current_lng;
+    if (lat == null || lng == null) return defaultCenter;
+
+    const parsedLat = Number(lat);
+    const parsedLng = Number(lng);
+    if (!Number.isFinite(parsedLat) || !Number.isFinite(parsedLng)) return defaultCenter;
+
+    return { lat: parsedLat, lng: parsedLng };
+  }, [session?.current_lat, session?.current_lng, defaultCenter]);
+
   const mapSrc = useMemo(() => {
-    if (!session?.current_lat || !session?.current_lng) return null;
-    const lat = Number(session.current_lat);
-    const lng = Number(session.current_lng);
-    return `https://www.google.com/maps?q=${lat},${lng}&z=16&output=embed`;
+    return `https://www.google.com/maps?q=${mapCenter.lat},${mapCenter.lng}&z=16&output=embed`;
+  }, [mapCenter.lat, mapCenter.lng]);
+
+  const hasGpsFix = useMemo(() => {
+    return session?.current_lat != null && session?.current_lng != null;
   }, [session?.current_lat, session?.current_lng]);
 
   // Initial load: session + latest breadcrumbs
@@ -129,26 +182,93 @@ export default function LiveWalk() {
     if (!sessionId) return;
 
     // Update the session's current position (for the client to subscribe to)
-    await supabase
+    const { error: sessionUpdateErr } = await supabase
       .from('walk_sessions')
       .update({ current_lat: latitude, current_lng: longitude })
       .eq('id', sessionId);
 
+    if (sessionUpdateErr) {
+      console.error('[live-walk] Failed to update session coords:', sessionUpdateErr);
+      throw sessionUpdateErr;
+    }
+
     // Insert breadcrumb (for history / trail)
-    await supabase.from('walk_breadcrumbs').insert({
+    const { error: crumbErr } = await supabase.from('walk_breadcrumbs').insert({
       walk_session_id: sessionId,
       lat: latitude,
       lng: longitude,
     });
+
+    if (crumbErr) {
+      console.error('[live-walk] Failed to insert breadcrumb:', crumbErr);
+      throw crumbErr;
+    }
+
+    setSession((prev) => (prev ? { ...prev, current_lat: latitude, current_lng: longitude } : prev));
+  };
+
+  const forceGpsPing = async () => {
+    if (!sessionId) return;
+
+    setPinging(true);
+    try {
+      if ('geolocation' in navigator) {
+        const coords = await new Promise<{ lat: number; lng: number }>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+            (err) => reject(err),
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+          );
+        });
+
+        await pushLocation(coords.lat, coords.lng);
+        toast({ title: 'GPS ping sent', description: 'Inserted one breadcrumb using your current device location.' });
+      } else {
+        // No geolocation available: insert a deterministic (but slightly jittered) fallback
+        const jitter = () => (Math.random() - 0.5) * 0.002; // ~200m
+        await pushLocation(defaultCenter.lat + jitter(), defaultCenter.lng + jitter());
+        toast({
+          title: 'GPS ping sent (fallback)',
+          description: 'Geolocation is unavailable, so we inserted a test coordinate near the default map center.',
+        });
+      }
+
+      // Refresh the latest crumbs immediately so the UI updates even if realtime is delayed
+      const { data: crumbs } = await supabase
+        .from('walk_breadcrumbs')
+        .select('*')
+        .eq('walk_session_id', sessionId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      setTrail(((crumbs as any) || []) as WalkBreadcrumb[]);
+    } catch (e: any) {
+      console.error('[live-walk] Force GPS ping failed:', e);
+      toast({ title: 'Could not send GPS ping', description: e?.message || 'Please try again.', variant: 'destructive' });
+    } finally {
+      setPinging(false);
+    }
   };
 
   // Provider: use watchPosition while sharing
   useEffect(() => {
-    if (!sessionId || !isProvider || !isSharing) return;
-    if (!('geolocation' in navigator)) return;
+    console.log('[live-walk] watchPosition effect', { sessionId, isProvider, isSharing });
 
-    const now = Date.now();
-    insertCooldownRef.current = now;
+    if (!sessionId || !isProvider || !isSharing) return;
+
+    if (!('geolocation' in navigator)) {
+      if (!permissionToastRef.current) {
+        permissionToastRef.current = true;
+        toast({
+          title: 'Geolocation unavailable',
+          description: 'This browser/device does not support GPS. Use "Force GPS Ping" for testing.',
+          variant: 'destructive',
+        });
+      }
+      return;
+    }
+
+    // Allow the very first callback to insert immediately
+    insertCooldownRef.current = 0;
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       async (pos) => {
@@ -159,11 +279,24 @@ export default function LiveWalk() {
         if (t - insertCooldownRef.current < 5000) return;
         insertCooldownRef.current = t;
 
-        await pushLocation(latitude, longitude);
-        setSession((prev) => (prev ? { ...prev, current_lat: latitude, current_lng: longitude } : prev));
+        try {
+          await pushLocation(latitude, longitude);
+        } catch {
+          // pushLocation already logs + throws; ignore to keep watching
+        }
       },
-      () => {
-        // ignore (permission denied / unavailable)
+      (err) => {
+        console.warn('[live-walk] watchPosition error', err);
+        if (!permissionToastRef.current) {
+          permissionToastRef.current = true;
+          toast({
+            title: 'GPS permission required',
+            description:
+              err?.message ||
+              'Please allow location permissions for this site so clients can follow the live walk.',
+            variant: 'destructive',
+          });
+        }
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
@@ -262,18 +395,23 @@ export default function LiveWalk() {
                       Map
                     </CardTitle>
                     <CardDescription>
-                      {session?.current_lat && session?.current_lng ? (
+                      {hasGpsFix ? (
                         <span>
-                          Last known • Lat {Number(session.current_lat).toFixed(5)} / Lng {Number(session.current_lng).toFixed(5)}
+                          Last known • Lat {Number(session?.current_lat).toFixed(5)} / Lng {Number(session?.current_lng).toFixed(5)}
                         </span>
                       ) : (
-                        'Waiting for the first GPS ping…'
+                        <span>
+                          Waiting for GPS ping… Showing a default map center so the screen isn't blank.
+                        </span>
                       )}
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
                       {isClient ? 'Client view' : isProvider ? 'Provider view' : 'Live'}
+                    </Badge>
+                    <Badge className="rounded-full bg-slate-100 text-slate-900 hover:bg-slate-100">
+                      {hasGpsFix ? 'GPS: live' : 'GPS: pending'}
                     </Badge>
                     {session?.status && (
                       <Badge className="rounded-full bg-slate-100 text-slate-900 hover:bg-slate-100">{session.status}</Badge>
@@ -282,17 +420,13 @@ export default function LiveWalk() {
                 </div>
               </CardHeader>
               <CardContent className="p-0">
-                {mapSrc ? (
-                  <iframe
-                    title="Live map"
-                    src={mapSrc}
-                    className="h-[360px] w-full border-0 sm:h-[460px]"
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                  />
-                ) : (
-                  <div className="grid h-[360px] place-items-center text-sm font-medium text-slate-600 sm:h-[460px]">No location yet.</div>
-                )}
+                <iframe
+                  title="Live map"
+                  src={mapSrc}
+                  className="h-[360px] w-full border-0 sm:h-[460px]"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
               </CardContent>
             </Card>
 
@@ -307,18 +441,23 @@ export default function LiveWalk() {
                     <CardDescription>
                       {isCompleted
                         ? 'This walk is completed.'
-                        : 'Tap Start to begin sharing location. When you\'re done, End Walk to close the session.'}
+                        : 'Tap Start to begin sharing location. For testing, Force GPS Ping inserts one breadcrumb immediately.'}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <Button
-                      onClick={() => {
+                      onClick={async () => {
                         if (isCompleted) return;
+
                         if (isSharing) {
                           void endWalk();
-                        } else {
-                          setIsSharing(true);
+                          return;
                         }
+
+                        // Flip sharing on and immediately request location once to trigger browser permissions.
+                        permissionToastRef.current = false;
+                        setIsSharing(true);
+                        await forceGpsPing();
                       }}
                       disabled={isCompleted}
                       className={
@@ -338,6 +477,16 @@ export default function LiveWalk() {
                           Start Walk
                         </>
                       )}
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      onClick={forceGpsPing}
+                      disabled={pinging || isCompleted}
+                      className="w-full rounded-full border-slate-200 bg-white text-slate-900 hover:bg-slate-50"
+                    >
+                      <Crosshair className="mr-2 h-4 w-4" />
+                      {pinging ? 'Pinging…' : 'Force GPS Ping'}
                     </Button>
 
                     <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-100">
