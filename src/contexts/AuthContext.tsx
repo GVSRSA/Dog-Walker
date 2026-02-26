@@ -10,6 +10,7 @@ interface AuthContextType {
   register: (email: string, password: string, fullName: string, role: 'client' | 'provider') => Promise<Profile | null>;
   logout: () => void;
   clearStaleSession: () => Promise<void>;
+  needsRedirectToLanding: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -17,20 +18,19 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<Profile | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [needsRedirectToLanding, setNeedsRedirectToLanding] = useState(false);
 
   useEffect(() => {
     const initUser = async () => {
-      console.log('[AuthContext] Initializing user session...');
+      console.log('[AuthContext] Checking user session...');
       const { data: { user }, error } = await supabase.auth.getUser();
       
       if (error) {
-        console.error('[AuthContext] Error getting user:', error);
-        
-        // If the user from the JWT doesn't exist (stale session from deleted user), clear it
-        if (error.message?.includes('does not exist') || error.name === 'AuthApiError') {
-          console.log('[AuthContext] Clearing stale session...');
-          await supabase.auth.signOut();
-        }
+        console.log('[AuthContext] Session invalid, clearing it:', error.message);
+        // Silently clear the invalid session
+        await supabase.auth.signOut();
+        // Flag that we need to redirect
+        setNeedsRedirectToLanding(true);
         return;
       }
       
@@ -44,7 +44,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .single();
         
         if (profileError) {
-          console.error('[AuthContext] Error fetching profile:', profileError);
+          console.log('[AuthContext] Profile not found, treating as guest');
+          // Silently treat as guest, don't show errors
+          setCurrentUser(null);
+          setIsAuthenticated(false);
           return;
         }
         
@@ -54,7 +57,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsAuthenticated(true);
         }
       } else {
-        console.log('[AuthContext] No user session found');
+        // No session - treat as guest (silent fail, no alerts)
+        console.log('[AuthContext] No session found, treating as guest');
+        setCurrentUser(null);
+        setIsAuthenticated(false);
       }
     };
     
@@ -166,6 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     register,
     logout,
     clearStaleSession,
+    needsRedirectToLanding,
   };
 
   return (
