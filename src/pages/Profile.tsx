@@ -12,7 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
-const AVATAR_BUCKET = "dog-photos";
+const AVATAR_BUCKET = "avatars";
+const AVATAR_BUCKET_FALLBACK = "dog-photos";
 
 export default function Profile() {
   const { currentUser, setCurrentUser, logout } = useAuth();
@@ -75,6 +76,17 @@ export default function Profile() {
     setAvatarPreview(url);
   };
 
+  const uploadToBucket = async (bucket: string, path: string, file: File) => {
+    const { error } = await supabase.storage.from(bucket).upload(path, file, {
+      upsert: true,
+      contentType: file.type,
+    });
+    if (error) throw error;
+
+    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+    return data.publicUrl;
+  };
+
   const uploadAvatarIfNeeded = async () => {
     if (!avatarFile || !currentUser) return avatarUrl;
 
@@ -83,14 +95,15 @@ export default function Profile() {
       const ext = avatarFile.name.split(".").pop()?.toLowerCase() || "png";
       const path = `${currentUser.id}/avatar-${Date.now()}.${ext}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from(AVATAR_BUCKET)
-        .upload(path, avatarFile, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
-      return data.publicUrl;
+      try {
+        return await uploadToBucket(AVATAR_BUCKET, path, avatarFile);
+      } catch (e: any) {
+        // If the dedicated avatar bucket doesn't exist, fall back to the shared dog photos bucket.
+        if (typeof e?.message === "string" && /bucket/i.test(e.message) && /not found/i.test(e.message)) {
+          return await uploadToBucket(AVATAR_BUCKET_FALLBACK, path, avatarFile);
+        }
+        throw e;
+      }
     } finally {
       setUploading(false);
     }

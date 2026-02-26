@@ -11,7 +11,9 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Dog } from '@/types';
-import { Dog as DogIcon, Plus, Trash2 } from 'lucide-react';
+import { Dog as DogIcon, Plus, Trash2, UploadCloud } from 'lucide-react';
+
+const DOG_PHOTO_BUCKET = 'dog-photos';
 
 export default function MyDogs() {
   const navigate = useNavigate();
@@ -20,6 +22,10 @@ export default function MyDogs() {
   const [dogs, setDogs] = useState<Dog[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const [form, setForm] = useState({
     name: '',
@@ -51,6 +57,56 @@ export default function MyDogs() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id]);
 
+  useEffect(() => {
+    if (!open) {
+      setPhotoFile(null);
+      setPhotoPreview((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+    }
+  }, [open]);
+
+  const handlePhotoPick = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Please choose an image file.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Please choose an image under 5MB.');
+      return;
+    }
+
+    setPhotoFile(file);
+    const url = URL.createObjectURL(file);
+    setPhotoPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return url;
+    });
+  };
+
+  const uploadDogPhotoIfNeeded = async (ownerId: string) => {
+    if (!photoFile) return null;
+
+    setUploadingPhoto(true);
+    try {
+      const ext = photoFile.name.split('.').pop()?.toLowerCase() || 'png';
+      const path = `${ownerId}/dogs/${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(DOG_PHOTO_BUCKET)
+        .upload(path, photoFile, { upsert: true, contentType: photoFile.type });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from(DOG_PHOTO_BUCKET).getPublicUrl(path);
+      return data.publicUrl;
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   const handleAddDog = async () => {
     if (!canSubmit) return;
 
@@ -63,6 +119,8 @@ export default function MyDogs() {
     const age = form.age.trim() ? Number(form.age) : null;
     const weight = form.weight.trim() ? String(form.weight) : null;
 
+    const image_url = await uploadDogPhotoIfNeeded(user.id);
+
     const { error } = await supabase.from('dogs').insert({
       owner_id: user.id,
       name: form.name.trim(),
@@ -70,6 +128,7 @@ export default function MyDogs() {
       age,
       weight,
       special_instructions: form.special_instructions.trim() || null,
+      image_url,
     });
 
     if (error) {
@@ -78,6 +137,11 @@ export default function MyDogs() {
     }
 
     setForm({ name: '', breed: '', age: '', weight: '', special_instructions: '' });
+    setPhotoFile(null);
+    setPhotoPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
     setOpen(false);
     await fetchMyDogs();
   };
@@ -112,10 +176,39 @@ export default function MyDogs() {
             <DialogContent className="rounded-2xl">
               <DialogHeader>
                 <DialogTitle>Add a dog</DialogTitle>
-                <DialogDescription>We’ll use this profile when you book a walk.</DialogDescription>
+                <DialogDescription>We'll use this profile when you book a walk.</DialogDescription>
               </DialogHeader>
 
               <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="dog-photo">Dog photo</Label>
+                  <div className="flex items-center gap-3">
+                    <div className="h-16 w-16 overflow-hidden rounded-2xl bg-emerald-50 ring-1 ring-emerald-100">
+                      {photoPreview ? (
+                        <img src={photoPreview} alt="Dog preview" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="grid h-full w-full place-items-center">
+                          <UploadCloud className="h-5 w-5 text-emerald-700" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="min-w-0">
+                      <Input
+                        id="dog-photo"
+                        type="file"
+                        accept="image/*"
+                        className="rounded-xl file:mr-3 file:rounded-full file:border-0 file:bg-emerald-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-emerald-800"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) handlePhotoPick(f);
+                        }}
+                      />
+                      <p className="mt-2 text-xs font-medium text-slate-500">PNG/JPG, up to 5MB.</p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid gap-2">
                   <Label htmlFor="dog-name">Name</Label>
                   <Input
@@ -175,10 +268,10 @@ export default function MyDogs() {
 
                 <Button
                   onClick={handleAddDog}
-                  disabled={!canSubmit}
+                  disabled={!canSubmit || uploadingPhoto}
                   className="rounded-xl bg-emerald-700 hover:bg-emerald-800"
                 >
-                  Save dog
+                  {uploadingPhoto ? 'Uploading…' : 'Save dog'}
                 </Button>
               </div>
             </DialogContent>
@@ -219,14 +312,28 @@ export default function MyDogs() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {dogs.map((dog) => (
-              <Card key={dog.id} className="rounded-2xl border-slate-200 bg-white">
+              <Card key={dog.id} className="overflow-hidden rounded-2xl border-slate-200 bg-white">
+                <div className="relative">
+                  <div className="aspect-[16/9] w-full bg-emerald-50">
+                    {dog.image_url ? (
+                      <img src={dog.image_url} alt={dog.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="grid h-full w-full place-items-center">
+                        <DogIcon className="h-8 w-8 text-emerald-700" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="absolute left-3 top-3">
+                    <Badge className="rounded-full bg-white/90 text-emerald-900 shadow-sm hover:bg-white/90">Active</Badge>
+                  </div>
+                </div>
+
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <CardTitle className="text-lg">{dog.name}</CardTitle>
                       <CardDescription>{dog.breed}</CardDescription>
                     </div>
-                    <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">Active</Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
