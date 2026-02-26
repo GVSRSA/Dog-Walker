@@ -72,6 +72,9 @@ export default function LiveWalk() {
 
   const isCompleted = session?.status === 'completed';
 
+  const [targetDurationMinutes, setTargetDurationMinutes] = useState<number | null>(null);
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+
   const defaultCenter = useMemo(() => {
     // If the profile contains a parsable lat/lng, center there; otherwise fallback to a city center.
     const fromProfile = parseProfileLocationToLatLng((currentUser as any)?.location);
@@ -177,6 +180,66 @@ export default function LiveWalk() {
       supabase.removeChannel(channel);
     };
   }, [sessionId, isClient]);
+
+  // Load expected duration for this session (max booking duration linked to session)
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const loadDuration = async () => {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('duration')
+        .eq('walk_session_id', sessionId);
+
+      if (error) {
+        console.error('[live-walk] Failed to load booking durations:', error);
+        return;
+      }
+
+      const minutes = Math.max(
+        0,
+        ...(data || [])
+          .map((r: any) => Number(r?.duration ?? 0))
+          .filter((n: number) => Number.isFinite(n) && n > 0)
+      );
+
+      setTargetDurationMinutes(minutes > 0 ? minutes : null);
+    };
+
+    loadDuration();
+  }, [sessionId]);
+
+  // Live timer: initialize from session start + target duration
+  useEffect(() => {
+    if (!session?.started_at || !targetDurationMinutes) {
+      setRemainingSeconds(null);
+      return;
+    }
+
+    const startedAtMs = new Date(session.started_at).getTime();
+    if (Number.isNaN(startedAtMs)) {
+      setRemainingSeconds(null);
+      return;
+    }
+
+    const totalSeconds = Math.round(targetDurationMinutes * 60);
+
+    const tick = () => {
+      const elapsed = Math.floor((Date.now() - startedAtMs) / 1000);
+      setRemainingSeconds(Math.max(0, totalSeconds - elapsed));
+    };
+
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [session?.started_at, targetDurationMinutes]);
+
+  const timerLabel = useMemo(() => {
+    if (!targetDurationMinutes || remainingSeconds == null) return null;
+    const mm = Math.floor(remainingSeconds / 60);
+    const ss = remainingSeconds % 60;
+    return `${mm}:${String(ss).padStart(2, '0')} / ${targetDurationMinutes}m`;
+  }, [remainingSeconds, targetDurationMinutes]);
 
   const pushLocation = async (latitude: number, longitude: number) => {
     if (!sessionId) return;
@@ -376,8 +439,17 @@ export default function LiveWalk() {
 
       <main className="container mx-auto px-4 py-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Live Walk</h1>
-          <p className="mt-1 text-sm font-medium text-slate-600">Real-time pack location updates.</p>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Live Walk</h1>
+              <p className="mt-1 text-sm font-medium text-slate-600">Real-time pack location updates.</p>
+            </div>
+            {timerLabel && (
+              <Badge className="rounded-full bg-violet-100 text-violet-900 hover:bg-violet-100">
+                Live Timer: {timerLabel}
+              </Badge>
+            )}
+          </div>
         </div>
 
         {!sessionId ? (

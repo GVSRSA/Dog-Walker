@@ -240,7 +240,21 @@ const ProviderDashboard = () => {
         return;
       }
 
-      const { error } = await supabase.from('bookings').update({ status: 'active' }).eq('id', bookingId);
+      // For solo walks, create a walk_session so LiveWalk can show the live timer + tracking
+      const { data: createdSession, error: sessionErr } = await supabase
+        .from('walk_sessions')
+        .insert({ walker_id: currentUser.id, status: 'active' })
+        .select('id')
+        .single();
+
+      if (sessionErr) throw sessionErr;
+
+      const sessionId = createdSession.id as string;
+
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: 'in_progress', walk_session_id: sessionId })
+        .eq('id', bookingId);
 
       if (error) {
         console.error('Error starting walk:', error);
@@ -263,7 +277,7 @@ const ProviderDashboard = () => {
 
             try {
               const { error: insertError } = await supabase.from('walk_breadcrumbs').insert({
-                walk_session_id: bookingId,
+                walk_session_id: sessionId,
                 lat: latitude,
                 lng: longitude,
               });
@@ -271,7 +285,7 @@ const ProviderDashboard = () => {
               if (insertError) {
                 console.error('[GPS] Failed to save breadcrumb:', insertError);
               } else {
-                console.log('[GPS] Breadcrumb saved:', { latitude, longitude, bookingId });
+                console.log('[GPS] Breadcrumb saved:', { latitude, longitude, sessionId });
               }
             } catch (err) {
               console.error('[GPS] Error saving breadcrumb:', err);
@@ -294,6 +308,7 @@ const ProviderDashboard = () => {
       setTrackingInterval(intervalId);
 
       await refreshBookings();
+      navigate(`/live-walk/${sessionId}`);
     } catch (err) {
       console.error('Error:', err);
       alert('Failed to start walk');
@@ -609,32 +624,43 @@ const ProviderDashboard = () => {
                       <TableRow>
                         <TableHead>Dog</TableHead>
                         <TableHead>Date</TableHead>
-                        <TableHead>Duration</TableHead>
                         <TableHead>Earnings</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {[...completedBookings, ...bookings.filter((b) => b.status === 'cancelled')].map((booking) => (
-                        <TableRow key={booking.id}>
-                          <TableCell className="font-medium">{bookingDogName(booking)}</TableCell>
-                          <TableCell>{booking.scheduled_at && format(new Date(booking.scheduled_at), 'PPP')}</TableCell>
-                          <TableCell>-</TableCell>
-                          <TableCell>R{booking.provider_payout?.toFixed(2) || '0.00'}</TableCell>
-                          <TableCell>
-                            <Badge variant={booking.status === 'completed' ? 'default' : 'outline'}>{booking.status}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            {booking.status === 'completed' && (
-                              <Button size="sm" onClick={() => handleRateBooking(booking)} className="bg-amber-600 hover:bg-amber-700">
-                                <Star className="w-4 h-4 mr-2" />
-                                Rate Client
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {[...completedBookings, ...bookings.filter((b) => b.status === 'cancelled')].map((booking) => {
+                        const minutes = Number(booking.duration ?? 0);
+                        const durationLabel = minutes > 0 ? `${minutes}m` : '—';
+                        const earnings = Number(booking.total_fee ?? 0);
+
+                        return (
+                          <TableRow key={booking.id}>
+                            <TableCell className="font-medium">{bookingDogName(booking)}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span>{booking.scheduled_at && format(new Date(booking.scheduled_at), 'PPP')}</span>
+                                <Badge className="rounded-full bg-slate-100 text-slate-900 hover:bg-slate-100">
+                                  {durationLabel}
+                                </Badge>
+                              </div>
+                            </TableCell>
+                            <TableCell>R{Number.isFinite(earnings) ? earnings.toFixed(2) : '0.00'}</TableCell>
+                            <TableCell>
+                              <Badge variant={booking.status === 'completed' ? 'default' : 'outline'}>{booking.status}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              {booking.status === 'completed' && (
+                                <Button size="sm" onClick={() => handleRateBooking(booking)} className="bg-amber-600 hover:bg-amber-700">
+                                  <Star className="w-4 h-4 mr-2" />
+                                  Rate Client
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 )}
