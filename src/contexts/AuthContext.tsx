@@ -1,195 +1,142 @@
-import { useState, useEffect, createContext } from 'react';
+import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-interface User {
+interface Profile {
   id: string;
   email: string;
-  password: string;
+  full_name?: string;
+  role: 'admin' | 'provider' | 'client';
+  is_approved?: boolean;
+  is_suspended?: boolean;
+  bio?: string;
+  location?: { lat: number; lng: number; address?: string };
+  services?: string[];
+  hourly_rate?: number;
+  credit_balance?: number;
+  total_walks?: number;
+  avg_rating?: number;
+  review_count?: number;
 }
 
-// Database connection
-const supabase = supabase;
-
-/**
- * Fetch user from Supabase by email and password
- */
-const fetchUser = async (email: string, password: string): Promise<User | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .eq('password', password)
-      .single();
-    
-    if (error) {
-      console.error('Error fetching user:', error);
-      return null;
-    }
-    
-    return data;
-  } catch (err) {
-    console.error('Error in fetchUser:', err);
-    return null;
-  }
-};
-
-/**
- * Login user
- */
-const login = async (email: string, password: string): Promise<User | null> => {
-  try {
-    // Try to fetch user first to verify credentials
-    const user = await fetchUser(email, password);
-    
-    if (!user) {
-      throw new Error('Invalid email or password');
-    }
-
-    const { data } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .update({
-        // Update last_login to now
-        last_login: new Date().toISOString(),
-      });
-    
-    if (error) {
-      console.error('Login failed:', error);
-      throw error;
-    }
-
-    return data;
-  } catch (err) {
-    console.error('Login error:', err);
-    throw err;
-  }
-};
-
-/**
- * Register new user
- */
-const register = async (email: string, password: string, role: 'client' | 'provider'): Promise<void> => {
-  try {
-    const { data } = await supabase
-      .from('users')
-      .insert({
-        email,
-        password,
-        role,
-        is_approved: false,
-        is_suspended: false,
-        created_at: new Date().toISOString(),
-      });
-
-    if (error) {
-      console.error('Registration failed:', error);
-      throw error;
-    }
-
-    return data;
-  } catch (err) {
-    console.error('Registration error:', err);
-    throw err;
-  }
-};
-
-/**
- * Logout user - clears session
- */
-const logout = async (): Promise<void> => {
-  try {
-    // Try Supabase logout endpoint
-    const { data } = await supabase
-      .post('/auth/v1/logout', {
-        credentials: 'include',
-        mode: 'cors'
-      });
-
-    if (error) {
-      console.error('Logout failed:', error);
-    }
-    
-    return data;
-  } catch (err) {
-    console.error('Logout error:', err);
-    }
-};
-
-// Context Types
 interface AuthContextType {
-  user: User | null;
+  currentUser: Profile | null;
+  setCurrentUser: (user: Profile | null) => void;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<User | null>;
+  login: (email: string, password: string) => Promise<Profile | null>;
   register: (email: string, password: string, role: 'client' | 'provider') => Promise<void>;
-  logout: () => Promise<void>;
-  setCurrentUser: (user: User) => void;
-  setIsAuthenticated: (value: boolean) => void;
+  logout: () => void;
 }
 
-// Create Context
-const AuthContext = createContext<AuthContextType>(null);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Main Provider
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<Profile | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Fetch current user on mount
   useEffect(() => {
     const initUser = async () => {
-      const { data: user } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       
-      if (data) {
-        setCurrentUser(data);
-        setIsAuthenticated(true);
+      if (user) {
+        // Fetch profile from database
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile) {
+          setCurrentUser(profile);
+          setIsAuthenticated(true);
+        }
       }
     };
     
     initUser();
   }, []);
 
-  // Logout handler
-  const handleLogout = async () => {
+  const login = async (email: string, password: string): Promise<Profile | null> => {
     try {
-      await logout();
-      setCurrentUser(null);
-      setIsAuthenticated(false);
-    } catch (err) {
-      console.error('Logout error:', err);
-    }
-  };
+      // Sign in with Supabase Auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-  // Login handler
-  const handleLogin = async (email: string, password: string) => {
-    try {
-      const user = await login(email, password);
-      setCurrentUser(user);
-      setIsAuthenticated(true);
+      if (error) {
+        throw error;
+      }
+
+      if (data.user) {
+        // Fetch profile from database
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+        
+        if (profile) {
+          setCurrentUser(profile);
+          setIsAuthenticated(true);
+          return profile;
+        }
+      }
+
+      return null;
     } catch (err) {
       console.error('Login error:', err);
+      throw err;
     }
   };
 
-  // Register handler
-  const handleRegister = async (email: string, password: string, role: 'client' | 'provider') => {
+  const register = async (email: string, password: string, role: 'client' | 'provider'): Promise<void> => {
     try {
-      await register(email, password, role);
+      // Sign up with Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.user) {
+        // Create profile in database
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: data.user.id,
+            email,
+            role,
+            is_approved: false,
+            is_suspended: false,
+            created_at: new Date().toISOString(),
+          });
+
+        if (profileError) {
+          throw profileError;
+        }
+      }
     } catch (err) {
       console.error('Registration error:', err);
+      throw err;
     }
+  };
+
+  const logout = () => {
+    supabase.auth.signOut();
+    setCurrentUser(null);
+    setIsAuthenticated(false);
   };
 
   const value = {
     currentUser,
     setCurrentUser,
     isAuthenticated,
-    login: handleLogin,
-    register: handleRegister,
+    login,
+    register,
     logout,
-    setCurrentUser,
-    isAuthenticated,
   };
 
   return (
@@ -197,4 +144,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       {children}
     </AuthContext.Provider>
   );
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };

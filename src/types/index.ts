@@ -1,72 +1,67 @@
 import { z } from 'zod';
-import { User, ProviderProfile, ClientProfile, Booking, Route, Route, RoutePoint, Dog, Transaction, CreditLedger, PlatformRevenue };
 
-// Common base user
-export interface BaseUser {
+// Profile types (from Supabase profiles table)
+export interface Profile {
   id: string;
   email: string;
-  name: string;
+  full_name: string;
   role: 'admin' | 'provider' | 'client';
-  isApproved: boolean;
-  isSuspended: boolean;
-  createdAt: Date;
-}
-
-// Admin
-export interface Admin extends BaseUser {
-  role: 'admin';
-}
-
-// Provider profile (extends BaseUser)
-export interface ProviderProfile extends BaseUser {
-  role: 'provider';
-  hourlyRate: number;
-  services: string[];
-  availableCredits: number;
-  totalWalks: number;
-  rating: number;
-  avg_rating?: number;
-  review_count?: number;
-  bio: string;
+  is_approved: boolean;
+  is_suspended: boolean;
+  bio?: string;
   location?: {
     lat: number;
     lng: number;
     address?: string;
   };
+  services?: string[];
+  hourly_rate?: number;
+  credit_balance?: number;
+  total_walks?: number;
+  avg_rating?: number;
+  review_count?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
-// Client profile (extends BaseUser)
-export interface ClientProfile extends BaseUser {
-  role: 'client';
-  dogs: Dog[];
-}
-
-// Dog type
+// Dog type (from Supabase dogs table)
 export interface Dog {
   id: string;
-  clientId: string;
+  owner_id: string;
   name: string;
   breed: string;
-  age: number;
-  weight: number;
-  energyLevel?: 'low' | 'medium' | 'high';
-  specialInstructions?: string;
+  age?: number;
+  weight?: number;
+  energy_level?: 'low' | 'medium' | 'high';
+  special_instructions?: string;
+  created_at?: string;
 }
 
-// Booking type (from database: bookings table)
+// Booking type (from Supabase bookings table)
 export interface Booking {
   id: string;
-  clientId: string;
-  providerId: string;
-  dogIds: string[];
-  scheduledDate: Date;
+  client_id: string;
+  provider_id: string;
+  dog_ids: string[];
+  scheduled_date: string;
   duration: number;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'active' | 'completed' | 'cancelled';
   price: number;
-  platformCommission: number; // 20%
-  providerPayout: number; // 80% (remaining after commission)
-  price: number;
-  dogIds: string[];
+  platform_fee?: number;
+  provider_payout?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Review type (from Supabase reviews table)
+export interface Review {
+  id: string;
+  booking_id: string;
+  reviewer_id: string;
+  provider_id: string;
+  rating: number;
+  comment: string;
+  created_at?: string;
 }
 
 // Route type (from database: tracking_logs table)
@@ -92,11 +87,11 @@ export interface RoutePoint {
 // Transaction type (from database: credit_ledger table)
 export interface Transaction {
   id: string;
-  providerId: string;
+  user_id: string;
   amount: number;
-  description: string;
-  transactionType: 'purchase' | 'booking_fee';
-  createdAt: Date;
+  credits: number;
+  type: 'purchase' | 'booking_fee' | 'refund';
+  created_at?: string;
 }
 
 // PlatformRevenue type (computed)
