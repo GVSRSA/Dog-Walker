@@ -151,7 +151,7 @@ export default function MyBookings() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <RoleNavbar activeKey="bookings" />
+      <RoleNavbar />
 
       <main className="container mx-auto px-4 py-8">
         <div className="mb-6 flex items-end justify-between gap-4">

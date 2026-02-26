@@ -163,7 +163,7 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen bg-[hsl(var(--background))]">
-      <RoleNavbar activeKey="profile" />
+      <RoleNavbar />
 
       <main className="container mx-auto max-w-4xl px-4 py-6 sm:py-10">
         <div className="grid gap-6 md:grid-cols-[320px_1fr]">

@@ -128,7 +128,7 @@ export default function BookingPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <RoleNavbar activeKey="find" />
+      <RoleNavbar />
 
       <main className="container mx-auto px-4 py-8">
         <div className="mb-6">

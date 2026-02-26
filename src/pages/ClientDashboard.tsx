@@ -376,7 +376,7 @@ const ClientDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <RoleNavbar activeKey={location.hash.replace('#', '') || 'providers'} />
+      <RoleNavbar />
 
       <div className="container mx-auto px-4 py-8">
         <section id="dogs" className="scroll-mt-24">
