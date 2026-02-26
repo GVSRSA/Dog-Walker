@@ -194,8 +194,20 @@ export default function RoleNavbar({ activeKey }: RoleNavbarProps) {
                   )}
                   aria-label="User identity"
                 >
-                  <span className="relative grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-sm font-extrabold text-slate-700 ring-1 ring-slate-200">
-                    {initials}
+                  <span className="relative h-9 w-9 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200">
+                    {currentUser?.avatar_url ? (
+                      <img
+                        src={currentUser.avatar_url}
+                        alt={displayName}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <span className="grid h-full w-full place-items-center text-sm font-semibold text-slate-700">
+                        {initials}
+                      </span>
+                    )}
                     <span
                       className={cn(
                         'absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-white',
@@ -219,11 +231,11 @@ export default function RoleNavbar({ activeKey }: RoleNavbarProps) {
                   </span>
 
                   <span className="min-w-0 text-left">
-                    <span className="block max-w-[220px] truncate text-sm font-extrabold tracking-tight text-slate-900">
+                    <span className="block max-w-[220px] truncate text-sm font-semibold text-slate-900">
                       {displayName}
                     </span>
                     <span className="block">
-                      <Badge className={cn('rounded-full px-2.5 py-0.5 text-[11px] font-extrabold', roleBadgeClass(role))}>
+                      <Badge className={cn('rounded-full px-2.5 py-0.5 text-[11px] font-semibold', roleBadgeClass(role))}>
                         {roleLabel(role)}
                       </Badge>
                     </span>
@@ -234,16 +246,16 @@ export default function RoleNavbar({ activeKey }: RoleNavbarProps) {
                 <DropdownMenuLabel className="px-3 py-2">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-extrabold text-slate-900">{displayName}</div>
-                      <div className="truncate text-xs font-semibold text-slate-500">{currentUser?.email}</div>
+                      <div className="truncate text-sm font-semibold text-slate-900">{displayName}</div>
+                      <div className="truncate text-xs font-medium text-slate-500">{currentUser?.email}</div>
                     </div>
-                    <Badge className={cn('rounded-full px-2.5 py-0.5 text-[11px] font-extrabold', roleBadgeClass(role))}>
+                    <Badge className={cn('rounded-full px-2.5 py-0.5 text-[11px] font-semibold', roleBadgeClass(role))}>
                       {roleLabel(role)}
                     </Badge>
                   </div>
                   <div className="mt-2 flex items-center gap-2">
                     <span className={cn('h-2.5 w-2.5 rounded-full ring-2', statusDotClass)} />
-                    <span className="text-xs font-semibold text-slate-600">
+                    <span className="text-xs font-medium text-slate-600">
                       {currentUser?.is_suspended
                         ? 'Suspended'
                         : currentUser?.is_approved
@@ -254,13 +266,13 @@ export default function RoleNavbar({ activeKey }: RoleNavbarProps) {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  className="cursor-pointer rounded-xl px-3 py-2 font-semibold"
+                  className="cursor-pointer rounded-xl px-3 py-2 font-medium"
                   onSelect={() => navigate('/profile')}
                 >
                   Profile
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  className="cursor-pointer rounded-xl px-3 py-2 font-semibold"
+                  className="cursor-pointer rounded-xl px-3 py-2 font-medium"
                   onSelect={() => navigate(homeRoute)}
                 >
                   Dashboard
