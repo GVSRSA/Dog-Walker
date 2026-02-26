@@ -10,6 +10,7 @@ interface AuthContextType {
   register: (email: string, password: string, fullName: string, role: 'client' | 'provider') => Promise<Profile | null>;
   logout: () => void;
   clearStaleSession: () => Promise<void>;
+  clearRedirectFlag: () => void;
   needsRedirectToLanding: boolean;
 }
 
@@ -29,8 +30,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('[AuthContext] Session invalid, clearing it:', error.message);
         // Silently clear the invalid session
         await supabase.auth.signOut();
-        // Flag that we need to redirect
-        setNeedsRedirectToLanding(true);
+        // Only set redirect flag if not already on landing page
+        const currentPath = window.location.pathname;
+        if (currentPath !== '/' && currentPath !== '/login' && currentPath !== '/register') {
+          setNeedsRedirectToLanding(true);
+        }
         return;
       }
       
@@ -164,6 +168,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthenticated(false);
   };
 
+  const clearRedirectFlag = () => {
+    console.log('[AuthContext] Clearing redirect flag');
+    setNeedsRedirectToLanding(false);
+  };
+
   const value = {
     currentUser,
     setCurrentUser,
@@ -172,6 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     register,
     logout,
     clearStaleSession,
+    clearRedirectFlag,
     needsRedirectToLanding,
   };
 

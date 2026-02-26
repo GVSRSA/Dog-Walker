@@ -4,6 +4,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dog, MapPin, CreditCard, Shield, Users, Clock } from 'lucide-react';
 
 const Landing = () => {
+  const handleLoginClick = () => {
+    console.log('Navigating to Login...');
+  };
+
+  const handleGetStartedClick = () => {
+    console.log('Navigating to Register...');
+  };
+
+  const handleClientRegisterClick = () => {
+    console.log('Navigating to Register as Client...');
+  };
+
+  const handleProviderRegisterClick = () => {
+    console.log('Navigating to Register as Provider...');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50">
       {/* Navigation */}
@@ -16,10 +32,10 @@ const Landing = () => {
           </div>
         </div>
         <div className="flex gap-4">
-          <Link to="/login">
+          <Link to="/login" onClick={handleLoginClick}>
             <Button variant="ghost" className="text-green-700 hover:text-green-800">Log In</Button>
           </Link>
-          <Link to="/register">
+          <Link to="/register" onClick={handleGetStartedClick}>
             <Button className="bg-green-700 hover:bg-green-800">Get Started</Button>
           </Link>
         </div>
@@ -38,7 +54,7 @@ const Landing = () => {
 
         {/* Role Cards */}
         <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto mt-16">
-          <Link to="/register?role=client">
+          <Link to="/register?role=client" onClick={handleClientRegisterClick}>
             <Card className="hover:shadow-xl transition-shadow cursor-pointer border-2 hover:border-green-300">
               <CardHeader>
                 <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -68,7 +84,7 @@ const Landing = () => {
             </Card>
           </Link>
 
-          <Link to="/register?role=provider">
+          <Link to="/register?role=provider" onClick={handleProviderRegisterClick}>
             <Card className="hover:shadow-xl transition-shadow cursor-pointer border-2 hover:border-green-300">
               <CardHeader>
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">

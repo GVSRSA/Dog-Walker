@@ -42,16 +42,19 @@ const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode;
 };
 
 const AuthRedirectHandler = () => {
-  const { needsRedirectToLanding, logout } = useAuth();
+  const { needsRedirectToLanding, logout, clearRedirectFlag } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (needsRedirectToLanding) {
       console.log('[AuthRedirectHandler] Redirecting to landing page due to invalid session');
-      navigate('/', { replace: true });
+      // Perform logout and navigate once
       logout();
+      navigate('/', { replace: true });
+      // Clear the flag to prevent continuous redirects
+      clearRedirectFlag();
     }
-  }, [needsRedirectToLanding, navigate, logout]);
+  }, [needsRedirectToLanding, navigate, logout, clearRedirectFlag]);
 
   return null;
 };
