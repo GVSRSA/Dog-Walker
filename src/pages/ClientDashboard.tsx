@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { RatingModal } from '@/components/RatingModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchDogs, fetchProviders, fetchReviews } from '@/utils/supabase/helpers';
@@ -762,40 +763,59 @@ const ClientDashboard = () => {
                                       <Label htmlFor="booking-time">Time</Label>
                                       <Input id="booking-time" type="time" value={selectedTime} onChange={(e) => setSelectedTime(e.target.value)} />
                                     </div>
-                                    <div>
-                                      <Label htmlFor="booking-duration">Duration</Label>
-                                      <Select value={selectedDuration} onValueChange={setSelectedDuration}>
-                                        <SelectTrigger id="booking-duration">
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="30">30 minutes</SelectItem>
-                                          <SelectItem value="60">1 hour</SelectItem>
-                                          <SelectItem value="90">1.5 hours</SelectItem>
-                                          <SelectItem value="120">2 hours</SelectItem>
-                                          <SelectItem value="180">3 hours</SelectItem>
-                                          <SelectItem value="240">4 hours</SelectItem>
-                                        </SelectContent>
-                                      </Select>
+                                    <div className="space-y-2">
+                                      <Label>Duration</Label>
+                                      <ToggleGroup
+                                        type="single"
+                                        value={selectedDuration}
+                                        onValueChange={(v) => {
+                                          if (v) setSelectedDuration(v);
+                                        }}
+                                        className="w-full justify-start gap-2"
+                                      >
+                                        <ToggleGroupItem
+                                          value="30"
+                                          className="flex-1 rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-900 data-[state=on]:border-emerald-600 data-[state=on]:bg-emerald-600 data-[state=on]:text-white"
+                                        >
+                                          30m
+                                        </ToggleGroupItem>
+                                        <ToggleGroupItem
+                                          value="60"
+                                          className="flex-1 rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-900 data-[state=on]:border-emerald-600 data-[state=on]:bg-emerald-600 data-[state=on]:text-white"
+                                        >
+                                          60m
+                                        </ToggleGroupItem>
+                                        <ToggleGroupItem
+                                          value="90"
+                                          className="flex-1 rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-900 data-[state=on]:border-emerald-600 data-[state=on]:bg-emerald-600 data-[state=on]:text-white"
+                                        >
+                                          90m
+                                        </ToggleGroupItem>
+                                      </ToggleGroup>
                                     </div>
-                                    {bookingError && <div className="text-red-600 text-sm">{bookingError}</div>}
+
                                     {selectedDate && selectedTime && selectedDuration && (
-                                      <div className="p-4 bg-green-50 rounded-lg">
-                                        <p className="text-sm text-gray-600">Estimated Cost:</p>
-                                        <p className="text-2xl font-bold text-green-900">
-                                          R{((provider.hourly_rate || 0) * parseInt(selectedDuration) / 60).toFixed(2)}
+                                      <div className="rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
+                                        <p className="text-sm font-semibold text-emerald-900">Estimated Total</p>
+                                        <p className="mt-1 text-3xl font-extrabold tracking-tight text-emerald-950">
+                                          R{(
+                                            (Number.parseInt(selectedDuration, 10) / 60) *
+                                            Number(selectedProvider?.walk_rate ?? selectedProvider?.hourly_rate ?? 0)
+                                          ).toFixed(2)}
                                         </p>
-                                        <p className="text-xs text-gray-600">
+                                        <p className="mt-1 text-xs font-semibold text-emerald-900/80">
                                           {format(new Date(selectedDate), 'PPP')} at {selectedTime}
                                         </p>
                                       </div>
                                     )}
+
+                                    {bookingError && <div className="text-red-600 text-sm">{bookingError}</div>}
                                     <Button
                                       onClick={handleBookService}
-                                      className="w-full bg-green-700 hover:bg-green-800"
+                                      className="w-full rounded-full bg-emerald-700 hover:bg-emerald-800"
                                       disabled={!selectedDog || !selectedDate || !selectedTime || !selectedDuration}
                                     >
-                                      Confirm Booking
+                                      Request Booking
                                     </Button>
                                   </div>
                                 )}
