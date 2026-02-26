@@ -4,89 +4,85 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Autumn theme (light) */
+    --background: 36 100% 97%;
+    --foreground: 24 28% 14%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 36 100% 99%;
+    --card-foreground: 24 28% 14%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 36 100% 99%;
+    --popover-foreground: 24 28% 14%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 22 88% 45%;
+    --primary-foreground: 36 100% 97%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 86 28% 88%;
+    --secondary-foreground: 24 28% 14%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 34 35% 92%;
+    --muted-foreground: 24 12% 35%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 44 92% 62%;
+    --accent-foreground: 24 28% 14%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 72% 48%;
+    --destructive-foreground: 36 100% 97%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 28 26% 85%;
+    --input: 28 26% 85%;
+    --ring: 22 88% 45%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 34 55% 94%;
+    --sidebar-foreground: 24 22% 18%;
+    --sidebar-primary: 16 74% 44%;
+    --sidebar-primary-foreground: 36 100% 97%;
+    --sidebar-accent: 40 70% 90%;
+    --sidebar-accent-foreground: 24 28% 14%;
+    --sidebar-border: 28 26% 84%;
+    --sidebar-ring: 44 92% 62%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Autumn theme (dark) */
+    --background: 24 24% 10%;
+    --foreground: 36 60% 92%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 24 24% 12%;
+    --card-foreground: 36 60% 92%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 24 24% 12%;
+    --popover-foreground: 36 60% 92%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 22 90% 58%;
+    --primary-foreground: 24 24% 10%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 85 16% 22%;
+    --secondary-foreground: 36 60% 92%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 28 18% 18%;
+    --muted-foreground: 35 25% 70%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 44 70% 30%;
+    --accent-foreground: 36 60% 92%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 55% 34%;
+    --destructive-foreground: 36 60% 92%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 24 16% 22%;
+    --input: 24 16% 22%;
+    --ring: 22 90% 58%;
+
+    --sidebar-background: 24 22% 9%;
+    --sidebar-foreground: 36 60% 92%;
+    --sidebar-primary: 22 90% 58%;
+    --sidebar-primary-foreground: 24 22% 9%;
+    --sidebar-accent: 28 18% 16%;
+    --sidebar-accent-foreground: 36 60% 92%;
+    --sidebar-border: 24 16% 18%;
+    --sidebar-ring: 44 70% 46%;
   }
 }
 
