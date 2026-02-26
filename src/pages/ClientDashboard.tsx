@@ -78,7 +78,7 @@ const ClientDashboard = () => {
 
   const calculateDistance = (provider: any) => {
     if (!provider.location) return null;
-    const R = 3959; // Earth's radius in miles
+    const R = 6371; // Earth's radius in kilometers (SA standard)
     const dLat = (provider.location.lat - clientLocation.lat) * Math.PI / 180;
     const dLon = (provider.location.lng - clientLocation.lng) * Math.PI / 180;
     const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -210,7 +210,7 @@ const ClientDashboard = () => {
                         </div>
                         {distance && (
                           <Badge variant="outline" className="ml-2">
-                            {distance} mi
+                            {distance} km
                           </Badge>
                         )}
                       </div>
