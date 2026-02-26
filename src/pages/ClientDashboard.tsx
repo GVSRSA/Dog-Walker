@@ -100,7 +100,7 @@ const ClientDashboard = () => {
           .from('bookings')
           .select('*')
           .eq('client_id', currentUser.id)
-          .order('scheduled_date', { ascending: false });
+          .order('scheduled_at', { ascending: true, nullsFirst: false });
 
         if (error) {
           console.error('Error fetching bookings:', error);
@@ -139,8 +139,8 @@ const ClientDashboard = () => {
     }
   }, [selectedProviderForReviews?.id]);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/');
   };
 
@@ -193,6 +193,7 @@ const ClientDashboard = () => {
       const price = parseFloat(selectedDuration) * (selectedProvider.hourly_rate || 0) / 60;
       const platformFee = price * 0.15; // 15% platform fee
       const providerPayout = price - platformFee;
+      const scheduledDateTime = `${selectedDate}T${selectedTime}`;
 
       const { error } = await supabase
         .from('bookings')
@@ -200,7 +201,8 @@ const ClientDashboard = () => {
           client_id: currentUser.id,
           provider_id: selectedProvider.id,
           dog_ids: [selectedDog],
-          scheduled_date: `${selectedDate}T${selectedTime}`,
+          scheduled_at: scheduledDateTime,
+          scheduled_date: selectedDate,
           duration: parseInt(selectedDuration),
           status: 'pending',
           price: price,
@@ -226,7 +228,7 @@ const ClientDashboard = () => {
           .from('bookings')
           .select('*')
           .eq('client_id', currentUser.id)
-          .order('scheduled_date', { ascending: false });
+          .order('scheduled_at', { ascending: true, nullsFirst: false });
 
         if (!fetchError) {
           setBookings(data || []);
@@ -304,6 +306,27 @@ const ClientDashboard = () => {
       </header>
 
       <div className="container mx-auto px-4 py-8">
+        {/* Empty State - No Dogs */}
+        {myDogs.length === 0 && (
+          <Card className="mb-8 border-dashed border-2 border-gray-300 bg-gray-50">
+            <CardContent className="py-12">
+              <div className="text-center">
+                <DogIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Dogs Yet!</h3>
+                <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                  Register your furry friend to start booking walks and adventures.
+                </p>
+                <Link to="/profile">
+                  <Button className="bg-green-700 hover:bg-green-800">
+                    <DogIcon className="w-4 h-4 mr-2" />
+                    Add Your First Dog
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Stats Cards */}
         <div className="grid md:grid-cols-4 gap-6 mb-8">
           <Card>

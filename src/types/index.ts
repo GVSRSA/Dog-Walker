@@ -43,8 +43,12 @@ export interface Booking {
   client_id?: string;
   provider_id?: string;
   dog_id?: string;
+  dog_ids?: string[];
   scheduled_at?: string;
+  scheduled_date?: string;
+  duration?: number;
   status?: 'pending' | 'confirmed' | 'active' | 'completed' | 'cancelled';
+  price?: number;
   total_fee?: number;
   platform_fee?: number;
   provider_payout?: number;
