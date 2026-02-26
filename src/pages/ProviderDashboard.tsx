@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import RoleNavbar from '@/components/RoleNavbar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,22 +8,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { RatingModal } from '@/components/RatingModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchBookings } from '@/utils/supabase/helpers';
 import { supabase } from '@/integrations/supabase/client';
 import type { Profile, Booking } from '@/types';
-import { 
-  LogOut, MapPin, Clock, DollarSign, Star, 
-  ShoppingCart, Play, Square, CreditCard, User,
-  Dog
+import {
+  MapPin,
+  Clock,
+  DollarSign,
+  Star,
+  ShoppingCart,
+  Play,
+  Square,
+  CreditCard,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
 const ProviderDashboard = () => {
-  const { logout, isAdmin } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentUser } = useAuth();
   const provider = currentUser as Profile;
 
@@ -35,6 +41,13 @@ const ProviderDashboard = () => {
   const [trackingInterval, setTrackingInterval] = useState<NodeJS.Timeout | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [ratingBooking, setRatingBooking] = useState<Booking | null>(null);
+
+  useEffect(() => {
+    const hash = location.hash.replace('#', '');
+    if (!hash) return;
+    const el = document.getElementById(hash);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [location.hash]);
 
   // Fetch bookings for provider
   useEffect(() => {
@@ -59,11 +72,6 @@ const ProviderDashboard = () => {
     fetchProviderBookings();
   }, [currentUser?.id]);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
-
   const handleRateBooking = (booking: Booking) => {
     setRatingBooking(booking);
     setShowRatingModal(true);
@@ -73,16 +81,14 @@ const ProviderDashboard = () => {
     if (!ratingBooking || !rating) return;
 
     try {
-      const { error } = await supabase
-        .from('reviews')
-        .insert({
-          booking_id: ratingBooking.id,
-          reviewer_id: currentUser.id,
-          provider_id: ratingBooking.provider_id,
-          rating,
-          comment,
-          created_at: new Date().toISOString(),
-        });
+      const { error } = await supabase.from('reviews').insert({
+        booking_id: ratingBooking.id,
+        reviewer_id: currentUser.id,
+        provider_id: ratingBooking.provider_id,
+        rating,
+        comment,
+        created_at: new Date().toISOString(),
+      });
 
       if (error) {
         console.error('Error submitting review:', error);
@@ -100,16 +106,12 @@ const ProviderDashboard = () => {
 
   const handleConfirmBooking = async (bookingId: string) => {
     try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: 'confirmed' })
-        .eq('id', bookingId);
+      const { error } = await supabase.from('bookings').update({ status: 'confirmed' }).eq('id', bookingId);
 
       if (error) {
         console.error('Error confirming booking:', error);
         alert('Failed to confirm booking');
       } else {
-        // Refresh bookings
         const { data, error: fetchError } = await fetchBookings(currentUser.id, 'provider');
         if (!fetchError) {
           setBookings(data || []);
@@ -123,10 +125,7 @@ const ProviderDashboard = () => {
 
   const handleStartWalk = async (bookingId: string) => {
     try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: 'active' })
-        .eq('id', bookingId);
+      const { error } = await supabase.from('bookings').update({ status: 'active' }).eq('id', bookingId);
 
       if (error) {
         console.error('Error starting walk:', error);
@@ -137,7 +136,6 @@ const ProviderDashboard = () => {
       setActiveBookingId(bookingId);
       setIsWalking(true);
 
-      // Start geolocation tracking with setInterval (every 5 minutes)
       const trackLocation = async () => {
         if (!('geolocation' in navigator)) {
           console.log('[GPS] Geolocation not supported');
@@ -147,16 +145,13 @@ const ProviderDashboard = () => {
         navigator.geolocation.getCurrentPosition(
           async (position) => {
             const { latitude, longitude } = position.coords;
-            
-            // Insert breadcrumb into walk_breadcrumbs table
+
             try {
-              const { error: insertError } = await supabase
-                .from('walk_breadcrumbs')
-                .insert({
-                  walk_session_id: bookingId,
-                  lat: latitude,
-                  lng: longitude,
-                });
+              const { error: insertError } = await supabase.from('walk_breadcrumbs').insert({
+                walk_session_id: bookingId,
+                lat: latitude,
+                lng: longitude,
+              });
 
               if (insertError) {
                 console.error('[GPS] Failed to save breadcrumb:', insertError);
@@ -168,25 +163,21 @@ const ProviderDashboard = () => {
             }
           },
           (error) => {
-            // Silent error handling - don't alert, just log
             console.log('[GPS] Failed to get location:', error.message);
           },
           {
             enableHighAccuracy: true,
             timeout: 10000,
-            maximumAge: 60000, // Accept locations up to 1 minute old
+            maximumAge: 60000,
           }
         );
       };
 
-      // Capture initial location immediately
       trackLocation();
 
-      // Set up interval for tracking every 5 minutes
-      const intervalId = setInterval(trackLocation, 5 * 60 * 1000); // 5 minutes in milliseconds
+      const intervalId = setInterval(trackLocation, 5 * 60 * 1000);
       setTrackingInterval(intervalId);
 
-      // Refresh bookings
       const { data, error: fetchError } = await fetchBookings(currentUser.id, 'provider');
       if (!fetchError) {
         setBookings(data || []);
@@ -199,16 +190,12 @@ const ProviderDashboard = () => {
 
   const handleEndWalk = async (bookingId: string) => {
     try {
-      // Stop geolocation tracking
       if (trackingInterval !== null) {
         clearInterval(trackingInterval);
         setTrackingInterval(null);
       }
 
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: 'completed' })
-        .eq('id', bookingId);
+      const { error } = await supabase.from('bookings').update({ status: 'completed' }).eq('id', bookingId);
 
       if (error) {
         console.error('Error ending walk:', error);
@@ -217,7 +204,6 @@ const ProviderDashboard = () => {
         setActiveBookingId(null);
         setIsWalking(false);
 
-        // Refresh bookings
         const { data, error: fetchError } = await fetchBookings(currentUser.id, 'provider');
         if (!fetchError) {
           setBookings(data || []);
@@ -242,23 +228,20 @@ const ProviderDashboard = () => {
 
   const handlePurchaseCredits = async () => {
     try {
-      const cost = creditAmount * 50; // R50 per credit
+      const cost = creditAmount * 50;
 
-      const { error } = await supabase
-        .from('transactions')
-        .insert({
-          user_id: currentUser.id,
-          amount: cost,
-          credits: creditAmount,
-          type: 'purchase',
-          created_at: new Date().toISOString(),
-        });
+      const { error } = await supabase.from('transactions').insert({
+        user_id: currentUser.id,
+        amount: cost,
+        credits: creditAmount,
+        type: 'purchase',
+        created_at: new Date().toISOString(),
+      });
 
       if (error) {
         console.error('Error purchasing credits:', error);
         alert('Failed to purchase credits');
       } else {
-        // Update provider credit balance
         const { error: balanceError } = await supabase
           .from('profiles')
           .update({
@@ -280,113 +263,77 @@ const ProviderDashboard = () => {
     }
   };
 
-  // Filter bookings by status
-  const pendingBookings = bookings.filter(b => b.status === 'pending');
-  const confirmedBookings = bookings.filter(b => b.status === 'confirmed');
-  const activeBookings = bookings.filter(b => b.status === 'active');
-  const completedBookings = bookings.filter(b => b.status === 'completed');
+  const pendingBookings = bookings.filter((b) => b.status === 'pending');
+  const confirmedBookings = bookings.filter((b) => b.status === 'confirmed');
+  const activeBookings = bookings.filter((b) => b.status === 'active');
+  const completedBookings = bookings.filter((b) => b.status === 'completed');
 
-  // Calculate earnings from completed bookings
   const totalEarnings = completedBookings.reduce((sum, b) => sum + (b.provider_payout || 0), 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-              <MapPin className="w-5 h-5 text-green-700" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">Dog Walker</h1>
-              <p className="text-sm text-green-700 font-medium">by Jolly Walker</p>
-              <p className="text-xs text-gray-600">Welcome, {provider?.full_name}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Show Admin Dashboard link for admins */}
-            {isAdmin && (
-              <Link to="/admin" className="text-sm text-green-700 hover:underline font-semibold">
-                Admin Dashboard
-              </Link>
-            )}
-            <Link to="/client" className="text-sm text-green-700 hover:underline">
-              Client Dashboard
-            </Link>
-            <Link to="/profile">
-              <Button variant="ghost" size="icon">
-                <User className="w-4 h-4" />
-              </Button>
-            </Link>
-            <Button variant="ghost" onClick={handleLogout}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
+      <RoleNavbar activeKey={location.hash.replace('#', '') || 'walks'} />
 
       <div className="container mx-auto px-4 py-8">
-        {/* Stats Cards */}
-        <div className="grid md:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Available Credits</CardTitle>
-              <CreditCard className="h-4 w-4 text-green-700" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{provider?.credit_balance || 0}</div>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={() => setShowPurchaseModal(true)}
-                className="mt-2 text-green-700 border-green-300 hover:bg-green-50"
-              >
-                Buy More
-              </Button>
-            </CardContent>
-          </Card>
+        <section id="earnings" className="scroll-mt-24">
+          {/* Stats Cards */}
+          <div className="grid md:grid-cols-4 gap-6 mb-8">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Available Credits</CardTitle>
+                <CreditCard className="h-4 w-4 text-green-700" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{provider?.credit_balance || 0}</div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowPurchaseModal(true)}
+                  className="mt-2 text-green-700 border-green-300 hover:bg-green-50"
+                >
+                  Buy More
+                </Button>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Rating</CardTitle>
-              <Star className="h-4 w-4 text-amber-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{provider?.avg_rating?.toFixed(1) || 'No ratings yet'}</div>
-              <p className="text-xs text-gray-600">{provider?.review_count || 0} reviews</p>
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Rating</CardTitle>
+                <Star className="h-4 w-4 text-amber-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{provider?.avg_rating?.toFixed(1) || 'No ratings yet'}</div>
+                <p className="text-xs text-gray-600">{provider?.review_count || 0} reviews</p>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Hourly Rate</CardTitle>
-              <DollarSign className="h-4 w-4 text-blue-700" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">R{provider?.hourly_rate || 0}</div>
-              <p className="text-xs text-gray-600">per hour</p>
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Hourly Rate</CardTitle>
+                <DollarSign className="h-4 w-4 text-blue-700" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">R{provider?.hourly_rate || 0}</div>
+                <p className="text-xs text-gray-600">per hour</p>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-blue-700" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                R{totalEarnings.toFixed(2)}
-              </div>
-              <p className="text-xs text-gray-600">{completedBookings.length} completed</p>
-            </CardContent>
-          </Card>
-        </div>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
+                <ShoppingCart className="h-4 w-4 text-blue-700" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">R{totalEarnings.toFixed(2)}</div>
+                <p className="text-xs text-gray-600">{completedBookings.length} completed</p>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Bookings Section */}
-          <div className="lg:col-span-2 space-y-6">
+          <section id="walks" className="scroll-mt-24 lg:col-span-2 space-y-6">
             {/* Pending Bookings */}
             <Card>
               <CardHeader>
@@ -408,7 +355,8 @@ const ProviderDashboard = () => {
                         <div>
                           <p className="font-semibold">Client ID: {booking.client_id.slice(0, 8)}...</p>
                           <p className="text-sm text-gray-600">
-                            {booking.scheduled_at && format(new Date(booking.scheduled_at), 'PPP')} at {booking.scheduled_at && format(new Date(booking.scheduled_at), 'HH:mm')}
+                            {booking.scheduled_at && format(new Date(booking.scheduled_at), 'PPP')} at{' '}
+                            {booking.scheduled_at && format(new Date(booking.scheduled_at), 'HH:mm')}
                           </p>
                         </div>
                         <div className="flex items-center gap-4">
@@ -419,7 +367,7 @@ const ProviderDashboard = () => {
                             disabled={isWalking}
                             className="bg-green-700 hover:bg-green-800"
                           >
-                            Confirm Booking
+                            Confirm
                           </Button>
                         </div>
                       </div>
@@ -443,7 +391,8 @@ const ProviderDashboard = () => {
                         <div>
                           <p className="font-semibold">Client ID: {booking.client_id.slice(0, 8)}...</p>
                           <p className="text-sm text-gray-600">
-                            {booking.scheduled_at && format(new Date(booking.scheduled_at), 'PPP')} at {booking.scheduled_at && format(new Date(booking.scheduled_at), 'HH:mm')}
+                            {booking.scheduled_at && format(new Date(booking.scheduled_at), 'PPP')} at{' '}
+                            {booking.scheduled_at && format(new Date(booking.scheduled_at), 'HH:mm')}
                           </p>
                         </div>
                         <div className="flex items-center gap-4">
@@ -479,11 +428,7 @@ const ProviderDashboard = () => {
                         <p className="font-semibold">Walking for client {booking.client_id.slice(0, 8)}...</p>
                         <p className="text-sm text-gray-600">Tracking location...</p>
                       </div>
-                      <Button
-                        size="sm"
-                        onClick={() => handleEndWalk(booking.id)}
-                        className="bg-red-600 hover:bg-red-700"
-                      >
+                      <Button size="sm" onClick={() => handleEndWalk(booking.id)} className="bg-red-600 hover:bg-red-700">
                         <Square className="w-4 h-4 mr-1" />
                         End Walk
                       </Button>
@@ -505,7 +450,7 @@ const ProviderDashboard = () => {
                     <div className="animate-spin rounded-full h-6 w-6 border-2 border-green-700 border-t-transparent mx-auto mb-2"></div>
                     Loading bookings...
                   </div>
-                ) : completedBookings.length === 0 && bookings.filter(b => b.status === 'cancelled').length === 0 ? (
+                ) : completedBookings.length === 0 && bookings.filter((b) => b.status === 'cancelled').length === 0 ? (
                   <p className="text-gray-500 text-center py-8">No booking history</p>
                 ) : (
                   <Table>
@@ -520,26 +465,18 @@ const ProviderDashboard = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {[...completedBookings, ...bookings.filter(b => b.status === 'cancelled')].map((booking) => (
+                      {[...completedBookings, ...bookings.filter((b) => b.status === 'cancelled')].map((booking) => (
                         <TableRow key={booking.id}>
                           <TableCell className="font-medium">ID: {booking.client_id?.slice(0, 8)}...</TableCell>
                           <TableCell>{booking.scheduled_at && format(new Date(booking.scheduled_at), 'PPP')}</TableCell>
                           <TableCell>-</TableCell>
                           <TableCell>R{booking.provider_payout?.toFixed(2) || '0.00'}</TableCell>
                           <TableCell>
-                            <Badge variant={
-                              booking.status === 'completed' ? 'default' : 'outline'
-                            }>
-                              {booking.status}
-                            </Badge>
+                            <Badge variant={booking.status === 'completed' ? 'default' : 'outline'}>{booking.status}</Badge>
                           </TableCell>
                           <TableCell>
                             {booking.status === 'completed' && (
-                              <Button
-                                size="sm"
-                                onClick={() => handleRateBooking(booking)}
-                                className="bg-amber-600 hover:bg-amber-700"
-                              >
+                              <Button size="sm" onClick={() => handleRateBooking(booking)} className="bg-amber-600 hover:bg-amber-700">
                                 <Star className="w-4 h-4 mr-2" />
                                 Rate Client
                               </Button>
@@ -552,42 +489,10 @@ const ProviderDashboard = () => {
                 )}
               </CardContent>
             </Card>
-          </div>
+          </section>
 
-          {/* Profile Section */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Profile</CardTitle>
-                <CardDescription>Your public profile information</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="provider-profile-name">Name</Label>
-                  <Input id="provider-profile-name" value={provider?.full_name || ''} disabled />
-                </div>
-                <div>
-                  <Label htmlFor="provider-profile-email">Email</Label>
-                  <Input id="provider-profile-email" value={provider?.email || ''} disabled />
-                </div>
-                <div>
-                  <Label htmlFor="provider-profile-bio">Bio</Label>
-                  <Input id="provider-profile-bio" value={provider?.bio || ''} placeholder="Tell clients about yourself" />
-                </div>
-                <div>
-                  <Label htmlFor="provider-profile-location">Location</Label>
-                  <Input id="provider-profile-location" value={provider?.location?.address || ''} placeholder="Your service area" />
-                </div>
-                <div>
-                  <Label htmlFor="provider-profile-rate">Hourly Rate (R)</Label>
-                  <Input id="provider-profile-rate" type="number" value={provider?.hourly_rate || 0} />
-                </div>
-                <Button className="w-full bg-green-700 hover:bg-green-800">
-                  Update Profile
-                </Button>
-              </CardContent>
-            </Card>
-
+          {/* Schedule Section */}
+          <section id="schedule" className="scroll-mt-24 space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Availability</CardTitle>
@@ -634,7 +539,7 @@ const ProviderDashboard = () => {
                 </div>
               </CardContent>
             </Card>
-          </div>
+          </section>
         </div>
       </div>
 
@@ -653,7 +558,11 @@ const ProviderDashboard = () => {
                     key={amount}
                     variant={creditAmount === amount ? 'default' : 'outline'}
                     onClick={() => setCreditAmount(amount)}
-                    className={creditAmount === amount ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
+                    className={
+                      creditAmount === amount
+                        ? 'bg-green-700 hover:bg-green-800'
+                        : 'text-green-700 border-green-300 hover:bg-green-50'
+                    }
                   >
                     {amount} credits
                   </Button>
@@ -664,7 +573,11 @@ const ProviderDashboard = () => {
                 <p className="text-sm text-gray-600">Total cost</p>
               </div>
               <div className="flex gap-4">
-                <Button variant="outline" onClick={() => setShowPurchaseModal(false)} className="flex-1 text-green-700 border-green-300 hover:bg-green-50">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowPurchaseModal(false)}
+                  className="flex-1 text-green-700 border-green-300 hover:bg-green-50"
+                >
                   Cancel
                 </Button>
                 <Button onClick={handlePurchaseCredits} className="flex-1 bg-green-700 hover:bg-green-800">

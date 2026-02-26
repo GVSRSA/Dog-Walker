@@ -1,29 +1,46 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import RoleNavbar from '@/components/RoleNavbar';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import type { Profile, Booking, Review } from '@/types';
-import { 
-  DollarSign, Users, ShoppingCart, TrendingUp, 
-  CheckCircle, XCircle, LogOut, Shield, Star, Dog
+import type { Profile, Booking, Review, Dog } from '@/types';
+import {
+  DollarSign,
+  Users,
+  ShoppingCart,
+  TrendingUp,
+  CheckCircle,
+  XCircle,
+  Shield,
+  Star,
+  Dog as DogIcon,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
 const AdminDashboard = () => {
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { currentUser } = useAuth();
-  
+
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [dogs, setDogs] = useState<Dog[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'bookings' | 'safety' | 'settings'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'dogs' | 'bookings'>('users');
   const [fetchError, setFetchError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'users' || tab === 'dogs' || tab === 'bookings') {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -49,21 +66,42 @@ const AdminDashboard = () => {
     }
   };
 
-  // Fetch all profiles
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  // Fetch all bookings
-useEffect(() => {
-  const fetchAllBookings = async () => {
+  const fetchAllDogs = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('bookings')
+        .from('dogs')
         .select('*')
-        .order('scheduled_at', { ascending: false });
-        
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching dogs:', error);
+      } else {
+        setDogs(data || []);
+      }
+    } catch (err) {
+      console.error('Error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch all profiles
+  useEffect(() => {
+    fetchUsers();
+    fetchAllDogs();
+  }, []);
+
+  // Fetch all bookings
+  useEffect(() => {
+    const fetchAllBookings = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('bookings')
+          .select('*')
+          .order('scheduled_at', { ascending: false });
+
         if (error) {
           console.error('Error fetching bookings:', error);
         } else {
@@ -87,7 +125,7 @@ useEffect(() => {
           .from('reviews')
           .select('*')
           .order('created_at', { ascending: false });
-        
+
         if (error) {
           console.error('Error fetching reviews:', error);
         } else {
@@ -100,11 +138,6 @@ useEffect(() => {
 
     fetchAllReviews();
   }, []);
-
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
 
   const handleApprove = async (userId: string) => {
     try {
@@ -189,309 +222,282 @@ useEffect(() => {
     URL.revokeObjectURL(url);
   };
 
-  // Calculate average rating for a user
-  const getAverageRating = (userId: string): number => {
-    const userReviews = reviews.filter(r => r.provider_id === userId);
-    if (userReviews.length === 0) return 0;
-    const sum = userReviews.reduce((acc, r) => acc + r.rating, 0);
-    return sum / userReviews.length;
-  };
-
-  // Get reviews for a user
-  const getUserReviews = (userId: string): Review[] => {
-    return reviews.filter(r => r.provider_id === userId);
-  };
-
   // Calculate platform revenue
   const totalRevenue = bookings.reduce((sum, b) => sum + (b.platform_fee || 0), 0);
 
   // Filter users
-  const pendingProviders = profiles.filter(p => p.role === 'provider' && !p.is_approved);
-  const activeProviders = profiles.filter(p => p.role === 'provider' && p.is_approved && !p.is_suspended);
-  const activeBookings = bookings.filter(b => b.status === 'active');
-  const completedBookings = bookings.filter(b => b.status === 'completed');
+  const pendingProviders = profiles.filter((p) => p.role === 'provider' && !p.is_approved);
+  const activeProviders = profiles.filter((p) => p.role === 'provider' && p.is_approved && !p.is_suspended);
+  const activeBookings = bookings.filter((b) => b.status === 'active');
+  const completedBookings = bookings.filter((b) => b.status === 'completed');
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex flex-col gap-3 md:flex-row md:justify-between md:items-center">
-          <div className="flex items-center gap-3">
-            <Shield className="w-8 h-8 text-green-700" />
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">Dog Walker</h1>
-              <p className="text-sm text-green-700 font-medium">by Jolly Walker</p>
-              <p className="text-xs text-gray-600">Welcome, {currentUser?.full_name}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={activeTab === 'users' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setActiveTab('users')}
-              className={activeTab === 'users' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
-            >
-              Users
-            </Button>
-            <Button
-              variant={activeTab === 'settings' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setActiveTab('settings')}
-              className={activeTab === 'settings' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
-            >
-              Settings
-            </Button>
-            <Button variant="ghost" onClick={handleLogout}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
+      <RoleNavbar activeKey={activeTab} />
 
       <div className="container mx-auto px-4 py-8">
-        {/* Tabs */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          <Button
-            variant={activeTab === 'overview' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('overview')}
-            className={activeTab === 'overview' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
-          >
-            Overview
-          </Button>
-          <Button
-            variant={activeTab === 'users' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('users')}
-            className={activeTab === 'users' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
-          >
-            Users ({pendingProviders.length > 0 && pendingProviders.length})
-          </Button>
-          <Button
-            variant={activeTab === 'bookings' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('bookings')}
-            className={activeTab === 'bookings' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
-          >
-            Bookings
-          </Button>
-          <Button
-            variant={activeTab === 'safety' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('safety')}
-            className={activeTab === 'safety' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
-          >
-            Safety
-          </Button>
+        {/* Top snapshot */}
+        <div className="grid gap-4 md:grid-cols-4 mb-8">
+          <Card className="rounded-2xl">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              <DollarSign className="h-4 w-4 text-green-700" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-extrabold tracking-tight">R{totalRevenue.toFixed(2)}</div>
+              <p className="text-xs text-gray-600">Platform commission</p>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+              <Users className="h-4 w-4 text-blue-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-extrabold tracking-tight">{profiles.length}</div>
+              <p className="text-xs text-gray-600">{activeProviders.length} active providers</p>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Dogs</CardTitle>
+              <DogIcon className="h-4 w-4 text-amber-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-extrabold tracking-tight">{dogs.length}</div>
+              <p className="text-xs text-gray-600">Registered pets</p>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Bookings</CardTitle>
+              <ShoppingCart className="h-4 w-4 text-purple-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-extrabold tracking-tight">{bookings.length}</div>
+              <p className="text-xs text-gray-600">{activeBookings.length} active • {completedBookings.length} completed</p>
+            </CardContent>
+          </Card>
         </div>
 
-        {activeTab === 'overview' && (
-          <>
-            {/* Stats Cards */}
-            <div className="grid md:grid-cols-4 gap-6 mb-8">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-                  <DollarSign className="h-4 w-4 text-green-700" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">R{totalRevenue.toFixed(2)}</div>
-                  <p className="text-xs text-gray-600">Platform commission</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-                  <Users className="h-4 w-4 text-blue-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{profiles.length}</div>
-                  <p className="text-xs text-gray-600">{activeProviders.length} active providers</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Bookings</CardTitle>
-                  <ShoppingCart className="h-4 w-4 text-orange-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{bookings.length}</div>
-                  <p className="text-xs text-gray-600">{activeBookings.length} active now</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Pending Approvals</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-purple-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{pendingProviders.length}</div>
-                  <p className="text-xs text-gray-600">Providers awaiting review</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Pending Providers */}
-            {pendingProviders.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Pending Provider Approvals</CardTitle>
-                  <CardDescription>Review and approve new service providers</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loading ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <Dog className="h-6 w-6 animate-spin mx-auto mb-2" />
-                      Loading...
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {pendingProviders.map((provider) => (
-                        <div key={provider.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                          <div>
-                            <p className="font-semibold">{provider.full_name}</p>
-                            <p className="text-sm text-gray-600">{provider.email}</p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => handleApprove(provider.id)}
-                              className="bg-green-700 hover:bg-green-800"
-                            >
-                              <CheckCircle className="w-4 h-4 mr-1" />
-                              Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleHardDelete(provider.id)}
-                            >
-                              <XCircle className="w-4 h-4 mr-1" />
-                              Delete
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-          </>
-        )}
-
         {activeTab === 'users' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>All Users</CardTitle>
-              <CardDescription>Manage platform users and their status</CardDescription>
+          <Card className="rounded-2xl">
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <CardTitle>Users</CardTitle>
+                <CardDescription>Approve, suspend, and manage platform users</CardDescription>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={fetchUsers} className="rounded-full border-green-200 text-green-800 hover:bg-green-50">
+                  Refresh
+                </Button>
+                <Button variant="outline" onClick={downloadUsersCsv} className="rounded-full border-slate-200 text-slate-700 hover:bg-slate-50">
+                  Download CSV
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {loading ? (
                 <div className="text-center py-8 text-gray-500">
-                  <Dog className="h-6 w-6 animate-spin mx-auto mb-2" />
+                  <DogIcon className="h-6 w-6 animate-spin mx-auto mb-2" />
                   Loading users...
                 </div>
               ) : fetchError ? (
-                <div className="p-6 bg-red-50 border border-red-200 rounded-lg">
+                <div className="p-6 bg-red-50 border border-red-200 rounded-xl">
                   <h3 className="font-semibold text-red-900 mb-2">Error Loading Users</h3>
-                  <p className="text-sm text-red-700 font-mono bg-red-100 p-3 rounded">{fetchError}</p>
+                  <p className="text-sm text-red-700 font-mono bg-red-100 p-3 rounded-lg">{fetchError}</p>
                   <p className="text-xs text-red-600 mt-2">This may be a permission issue. Check your RLS policies.</p>
                 </div>
               ) : profiles.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <Users className="h-10 w-10 mx-auto mb-2 text-gray-400" />
                   <p className="text-gray-600 mb-2">No users found in the database</p>
-                  <p className="text-xs text-gray-500">This could mean the profiles table is empty or there's a permission issue.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Pending Providers */}
+                  {pendingProviders.length > 0 && (
+                    <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="font-semibold text-amber-900">Pending Provider Approvals</p>
+                          <p className="text-sm text-amber-800/80">Review and approve new service providers</p>
+                        </div>
+                        <Badge className="bg-amber-200 text-amber-900 hover:bg-amber-200">{pendingProviders.length}</Badge>
+                      </div>
+                      <div className="mt-4 space-y-3">
+                        {pendingProviders.map((provider) => (
+                          <div key={provider.id} className="flex flex-col gap-3 rounded-xl bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <p className="font-semibold text-slate-900">{provider.full_name}</p>
+                              <p className="text-sm text-slate-600">{provider.email}</p>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={() => handleApprove(provider.id)} className="rounded-full bg-green-700 hover:bg-green-800">
+                                <CheckCircle className="w-4 h-4 mr-1" />
+                                Approve
+                              </Button>
+                              <Button size="sm" variant="destructive" className="rounded-full" onClick={() => handleHardDelete(provider.id)}>
+                                <XCircle className="w-4 h-4 mr-1" />
+                                Delete
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {profiles.map((profile) => (
+                        <TableRow
+                          key={profile.id}
+                          className={profile.is_suspended ? 'bg-slate-50 text-slate-500' : undefined}
+                        >
+                          <TableCell className="font-medium">{profile.full_name}</TableCell>
+                          <TableCell>{profile.email}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                profile.role === 'admin'
+                                  ? 'default'
+                                  : profile.role === 'provider'
+                                    ? 'secondary'
+                                    : 'outline'
+                              }
+                            >
+                              {profile.role}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Badge
+                                className={
+                                  profile.is_approved
+                                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                    : 'bg-amber-100 text-amber-900 border border-amber-200 hover:bg-amber-100'
+                                }
+                              >
+                                {profile.is_approved ? 'Approved' : 'Pending'}
+                              </Badge>
+                              {profile.is_suspended && (
+                                <Badge className="bg-slate-200 text-slate-900 border border-slate-300 hover:bg-slate-200">Suspended</Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-2">
+                              {!profile.is_approved && profile.role !== 'admin' && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleApprove(profile.id)}
+                                  className="rounded-full bg-green-700 hover:bg-green-800"
+                                >
+                                  Approve
+                                </Button>
+                              )}
+
+                              {profile.role !== 'admin' && (profile.is_approved || profile.is_suspended) &&
+                                (profile.is_suspended ? (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleSetSuspended(profile.id, false)}
+                                    className="rounded-full bg-emerald-600 text-white hover:bg-emerald-700"
+                                  >
+                                    Unsuspend
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    className="rounded-full"
+                                    onClick={() => handleSetSuspended(profile.id, true)}
+                                  >
+                                    Suspend
+                                  </Button>
+                                ))}
+
+                              {profile.role !== 'admin' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleHardDelete(profile.id)}
+                                  className="rounded-full border-red-200 text-red-700 hover:bg-red-50"
+                                >
+                                  Delete
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === 'dogs' && (
+          <Card className="rounded-2xl">
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <CardTitle>Dogs</CardTitle>
+                <CardDescription>All registered dogs on the platform</CardDescription>
+              </div>
+              <Button variant="outline" onClick={fetchAllDogs} className="rounded-full border-green-200 text-green-800 hover:bg-green-50">
+                Refresh
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="text-center py-8 text-gray-500">
+                  <DogIcon className="h-6 w-6 animate-spin mx-auto mb-2" />
+                  Loading dogs...
+                </div>
+              ) : dogs.length === 0 ? (
+                <div className="text-center py-10 text-gray-500">
+                  <DogIcon className="h-10 w-10 mx-auto mb-2 text-gray-400" />
+                  <p>No dogs found</p>
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead>Breed</TableHead>
+                      <TableHead>Age</TableHead>
+                      <TableHead>Owner</TableHead>
+                      <TableHead>Created</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {profiles.map((profile) => (
-                      <TableRow
-                        key={profile.id}
-                        className={profile.is_suspended ? 'bg-slate-50 text-slate-500' : undefined}
-                      >
-                        <TableCell className="font-medium">{profile.full_name}</TableCell>
-                        <TableCell>{profile.email}</TableCell>
-                        <TableCell>
-                          <Badge variant={
-                            profile.role === 'admin' ? 'default' : 
-                            profile.role === 'provider' ? 'secondary' : 'outline'
-                          }>
-                            {profile.role}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Badge
-                              className={profile.is_approved
-                                ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                                : 'bg-amber-100 text-amber-900 border border-amber-200 hover:bg-amber-100'
-                              }
-                            >
-                              {profile.is_approved ? 'Approved' : 'Pending'}
-                            </Badge>
-                            {profile.is_suspended && (
-                              <Badge className="bg-slate-200 text-slate-900 border border-slate-300 hover:bg-slate-200">Suspended</Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-2">
-                            {!profile.is_approved && profile.role !== 'admin' && (
-                              <Button
-                                size="sm"
-                                onClick={() => handleApprove(profile.id)}
-                                className="bg-green-700 hover:bg-green-800"
-                              >
-                                Approve
-                              </Button>
-                            )}
-
-                            {profile.role !== 'admin' && (profile.is_approved || profile.is_suspended) && (
-                              profile.is_suspended ? (
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleSetSuspended(profile.id, false)}
-                                  className="bg-emerald-600 text-white hover:bg-emerald-700"
-                                >
-                                  Unsuspend
-                                </Button>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => handleSetSuspended(profile.id, true)}
-                                >
-                                  Suspend
-                                </Button>
-                              )
-                            )}
-
-                            {profile.role !== 'admin' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleHardDelete(profile.id)}
-                                className="border-red-200 text-red-700 hover:bg-red-50"
-                              >
-                                Delete
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {dogs.map((dog) => {
+                      const owner = profiles.find((p) => p.id === dog.owner_id);
+                      return (
+                        <TableRow key={dog.id}>
+                          <TableCell className="font-medium">{dog.name}</TableCell>
+                          <TableCell>{dog.breed}</TableCell>
+                          <TableCell>{dog.age ?? '-'}</TableCell>
+                          <TableCell>{owner?.full_name || dog.owner_id.slice(0, 8) + '...'}</TableCell>
+                          <TableCell>{dog.created_at ? format(new Date(dog.created_at), 'PPP') : '-'}</TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}
@@ -499,70 +505,16 @@ useEffect(() => {
           </Card>
         )}
 
-        {activeTab === 'settings' && (
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Data Tools</CardTitle>
-                <CardDescription>Quick actions for managing your platform</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-3">
-                <Button
-                  variant="outline"
-                  onClick={fetchUsers}
-                  className="justify-start"
-                >
-                  <Users className="w-4 h-4 mr-2" />
-                  Refresh user list
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={downloadUsersCsv}
-                  className="justify-start"
-                >
-                  <ShoppingCart className="w-4 h-4 mr-2" />
-                  Download users CSV
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Platform Snapshot</CardTitle>
-                <CardDescription>Live counts based on current data</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Total users</span>
-                  <span className="font-semibold text-gray-900">{profiles.length}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Pending providers</span>
-                  <span className="font-semibold text-amber-700">{pendingProviders.length}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Active bookings</span>
-                  <span className="font-semibold text-gray-900">{activeBookings.length}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Completed bookings</span>
-                  <span className="font-semibold text-gray-900">{completedBookings.length}</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
         {activeTab === 'bookings' && (
-          <Card>
+          <Card className="rounded-2xl">
             <CardHeader>
-              <CardTitle>All Bookings</CardTitle>
+              <CardTitle>Bookings</CardTitle>
               <CardDescription>View and manage all platform bookings</CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? (
                 <div className="text-center py-8 text-gray-500">
-                  <Dog className="h-6 w-6 animate-spin mx-auto mb-2" />
+                  <DogIcon className="h-6 w-6 animate-spin mx-auto mb-2" />
                   Loading bookings...
                 </div>
               ) : bookings.length === 0 ? (
@@ -581,21 +533,27 @@ useEffect(() => {
                   </TableHeader>
                   <TableBody>
                     {bookings.map((booking) => {
-                      const client = profiles.find(p => p.id === booking.client_id);
-                      const provider = profiles.find(p => p.id === booking.provider_id);
+                      const client = profiles.find((p) => p.id === booking.client_id);
+                      const provider = profiles.find((p) => p.id === booking.provider_id);
                       return (
                         <TableRow key={booking.id}>
                           <TableCell className="font-medium">{booking.id.slice(0, 8)}...</TableCell>
-                              <TableCell>{client?.full_name}</TableCell>
-                              <TableCell>{provider?.full_name}</TableCell>
-                              <TableCell>{format(new Date(booking.scheduled_at), 'PPP')}</TableCell>
-                                  <TableCell>R{booking.total_fee?.toFixed(2) || 'N/A'}</TableCell>
+                          <TableCell>{client?.full_name}</TableCell>
+                          <TableCell>{provider?.full_name}</TableCell>
+                          <TableCell>{booking.scheduled_at ? format(new Date(booking.scheduled_at), 'PPP') : '-'}</TableCell>
+                          <TableCell>R{booking.total_fee?.toFixed(2) || 'N/A'}</TableCell>
                           <TableCell>
-                            <Badge variant={
-                              booking.status === 'completed' ? 'default' :
-                              booking.status === 'active' ? 'secondary' :
-                              booking.status === 'pending' ? 'outline' : 'destructive'
-                            }>
+                            <Badge
+                              variant={
+                                booking.status === 'completed'
+                                  ? 'default'
+                                  : booking.status === 'active'
+                                    ? 'secondary'
+                                    : booking.status === 'pending'
+                                      ? 'outline'
+                                      : 'destructive'
+                              }
+                            >
                               {booking.status}
                             </Badge>
                           </TableCell>
@@ -605,144 +563,6 @@ useEffect(() => {
                   </TableBody>
                 </Table>
               )}
-            </CardContent>
-          </Card>
-        )}
-
-        {activeTab === 'safety' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Safety Dashboard</CardTitle>
-              <CardDescription>Monitor users with low ratings and take action</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {/* Low Rated Providers */}
-                <div>
-                  <h3 className="font-semibold mb-4">Providers with Rating Below 3.0</h3>
-                  {loading ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <Dog className="h-6 w-6 animate-spin mx-auto mb-2" />
-                      Loading...
-                    </div>
-                  ) : profiles.filter(u => {
-                    const avgRating = getAverageRating(u.id);
-                    return avgRating > 0 && avgRating < 3.0 && u.role === 'provider';
-                  }).length === 0 ? (
-                    <p className="text-gray-500 text-center py-8">No providers with low ratings</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {profiles.filter(u => {
-                        const avgRating = getAverageRating(u.id);
-                        return avgRating > 0 && avgRating < 3.0 && u.role === 'provider';
-                      }).map((user) => {
-                        const avgRating = getAverageRating(user.id);
-                        const userReviews = getUserReviews(user.id);
-                        return (
-                          <div key={user.id} className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-lg">
-                            <div>
-                              <p className="font-semibold text-red-900">{user.full_name}</p>
-                              <p className="text-sm text-gray-600">{user.email}</p>
-                              <p className="text-sm text-gray-600">{user.location?.address || 'No location set'}</p>
-                              <div className="flex items-center gap-2 mt-2">
-                                <Star className="w-4 h-4 text-red-500" />
-                                <span className="text-red-700 font-semibold">{avgRating.toFixed(1)} / 5.0</span>
-                                <span className="text-gray-600">({userReviews.length} reviews)</span>
-                              </div>
-                              <div className="mt-2 text-sm text-gray-600">
-                                {userReviews.slice(-2).map(review => (
-                                  <p key={review.id} className="italic">"{review.comment}"</p>
-                                ))}
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              {user.is_suspended ? (
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleSetSuspended(user.id, false)}
-                                  className="bg-emerald-600 text-white hover:bg-emerald-700"
-                                >
-                                  Unsuspend
-                                </Button>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => handleSetSuspended(user.id, true)}
-                                >
-                                  <XCircle className="w-4 h-4 mr-2" />
-                                  Suspend User
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* Low Rated Clients */}
-                <div>
-                  <h3 className="font-semibold mb-4">Clients with Rating Below 3.0</h3>
-                  {profiles.filter(u => {
-                    const avgRating = getAverageRating(u.id);
-                    return avgRating > 0 && avgRating < 3.0 && u.role === 'client';
-                  }).length === 0 ? (
-                    <p className="text-gray-500 text-center py-8">No clients with low ratings</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {profiles.filter(u => {
-                        const avgRating = getAverageRating(u.id);
-                        return avgRating > 0 && avgRating < 3.0 && u.role === 'client';
-                      }).map((user) => {
-                        const avgRating = getAverageRating(user.id);
-                        const userReviews = getUserReviews(user.id);
-                        return (
-                          <div key={user.id} className="flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                            <div>
-                              <p className="font-semibold text-amber-900">{user.full_name}</p>
-                              <p className="text-sm text-gray-600">{user.email}</p>
-                              <p className="text-sm text-gray-600">{user.location?.address || 'No location set'}</p>
-                              <div className="flex items-center gap-2 mt-2">
-                                <Star className="w-4 h-4 text-amber-500" />
-                                <span className="text-amber-700 font-semibold">{avgRating.toFixed(1)} / 5.0</span>
-                                <span className="text-gray-600">({userReviews.length} reviews)</span>
-                              </div>
-                              <div className="mt-2 text-sm text-gray-600">
-                                {userReviews.slice(-2).map(review => (
-                                  <p key={review.id} className="italic">"{review.comment}"</p>
-                                ))}
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              {user.is_suspended ? (
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleSetSuspended(user.id, false)}
-                                  className="bg-emerald-600 text-white hover:bg-emerald-700"
-                                >
-                                  Unsuspend
-                                </Button>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleSetSuspended(user.id, true)}
-                                  className="border-amber-300 text-amber-700 hover:bg-amber-50"
-                                >
-                                  <XCircle className="w-4 h-4 mr-2" />
-                                  Suspend User
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
             </CardContent>
           </Card>
         )}
