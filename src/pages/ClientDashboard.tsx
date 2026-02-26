@@ -160,8 +160,9 @@ const ClientDashboard = () => {
 
   // Fetch breadcrumbs for active walk
   useEffect(() => {
-    const activeBooking = bookings.find((b) => b.status === 'active');
-    if (!activeBooking?.id) {
+    const activeBooking = bookings.find((b) => b.status === 'active' || b.status === 'in_progress');
+    const sessionId = activeBooking?.walk_session_id || activeBooking?.id;
+    if (!sessionId) {
       setActiveWalkBreadcrumbs([]);
       return;
     }
@@ -172,7 +173,7 @@ const ClientDashboard = () => {
         const { data, error } = await supabase
           .from('walk_breadcrumbs')
           .select('*')
-          .eq('walk_session_id', activeBooking.id)
+          .eq('walk_session_id', sessionId)
           .order('created_at', { ascending: false })
           .limit(10);
 
@@ -191,14 +192,14 @@ const ClientDashboard = () => {
     fetchBreadcrumbs();
 
     const channel = supabase
-      .channel(`walk_breadcrumbs:${activeBooking.id}`)
+      .channel(`walk_breadcrumbs:${sessionId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'walk_breadcrumbs',
-          filter: `walk_session_id=eq.${activeBooking.id}`,
+          filter: `walk_session_id=eq.${sessionId}`,
         },
         (payload) => {
           setActiveWalkBreadcrumbs((prev) => {
@@ -258,66 +259,79 @@ const ClientDashboard = () => {
     }
 
     // Prevent orphan bookings + ensure the dog belongs to the current client
-    const dog = myDogs.find((d) => d.id === selectedDog);
-    if (!dog) {
-      setBookingError("Please select a dog from your list (add a dog first if you don't have one).");
+    const { data: ownedDog } = await supabase
+      .from('dogs')
+      .select('id')
+      .eq('id', selectedDog)
+      .eq('owner_id', currentUser.id)
+      .maybeSingle();
+
+    if (!ownedDog) {
+      setBookingError('Please select one of your dogs.');
       return;
     }
 
-    setBookingError('');
+    // Check if provider is approved
+    const { data: provider, error: providerError } = await supabase
+      .from('profiles')
+      .select('is_approved,is_suspended')
+      .eq('id', selectedProvider.id)
+      .single();
+
+    if (providerError || !provider?.is_approved || provider?.is_suspended) {
+      setBookingError('This provider is not approved or is suspended');
+      return;
+    }
 
     try {
-      // Re-check provider approval at booking time
-      const { data: providerCheck, error: providerCheckError } = await supabase
-        .from('profiles')
-        .select('is_approved,is_suspended')
-        .eq('id', selectedProvider.id)
-        .single();
-
-      if (providerCheckError) {
-        console.error('Error verifying provider approval:', providerCheckError);
-        setBookingError('Could not verify provider approval. Please try again.');
-        return;
-      }
-
-      if (!providerCheck?.is_approved || providerCheck?.is_suspended) {
-        setBookingError('This walker is not approved (or is currently unavailable). Please choose another.');
-        return;
-      }
-
-      const totalFee = (parseFloat(selectedDuration) * (selectedProvider.hourly_rate || 0)) / 60;
+      // Calculate fees
+      const durationHours = parseInt(selectedDuration) / 60;
+      const totalFee = (selectedProvider.hourly_rate || 0) * durationHours;
       const platformFee = totalFee * 0.15;
       const providerPayout = totalFee - platformFee;
-      const scheduledDateTime = `${selectedDate}T${selectedTime}`;
 
+      // Create booking
       const { error } = await supabase.from('bookings').insert({
         client_id: currentUser.id,
         provider_id: selectedProvider.id,
         dog_id: selectedDog,
-        scheduled_at: scheduledDateTime,
-        scheduled_date: selectedDate,
         status: 'pending',
+        scheduled_date: selectedDate,
+        scheduled_at: `${selectedDate}T${selectedTime}`,
+        duration: parseInt(selectedDuration),
         total_fee: totalFee,
         platform_fee: platformFee,
         provider_payout: providerPayout,
+        created_at: new Date().toISOString(),
       });
 
       if (error) {
         console.error('Error creating booking:', error);
-        setBookingError(error.message || 'Failed to create booking');
+        setBookingError('Failed to create booking');
       } else {
-        setShowBookingModal(false);
+        setBookingError('');
+        alert('Booking created successfully!');
+
+        // Refresh bookings
+        const { data: bookingsData, error: fetchError } = await supabase
+          .from('bookings')
+          .select('*')
+          .eq('client_id', currentUser.id)
+          .order('scheduled_at', { ascending: true, nullsFirst: false });
+
+        if (!fetchError) {
+          setBookings(bookingsData || []);
+        }
+
+        // Reset form
+        setSelectedProvider(null);
         setSelectedDog('');
         setSelectedDate('');
         setSelectedTime('');
         setSelectedDuration('60');
-        setBookingError('');
-        alert('Booking created successfully!');
-
-        navigate('/my-bookings', { replace: true });
       }
     } catch (err) {
-      console.error('Booking error:', err);
+      console.error('Error:', err);
       setBookingError('Failed to create booking');
     }
   };
@@ -362,7 +376,7 @@ const ClientDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <RoleNavbar activeKey={location.hash.replace('#', '') || 'dogs'} />
+      <RoleNavbar activeKey={location.hash.replace('#', '') || 'providers'} />
 
       <div className="container mx-auto px-4 py-8">
         <section id="dogs" className="scroll-mt-24">

@@ -1,77 +1,102 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import RoleNavbar from '@/components/RoleNavbar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { MapPin, Navigation, Satellite } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
+import type { WalkBreadcrumb, WalkSession } from '@/types';
+import { MapPin, Navigation, Satellite, Square, Users } from 'lucide-react';
 import { format } from 'date-fns';
-
-type Breadcrumb = {
-  id: string;
-  walk_session_id: string;
-  lat: number;
-  lng: number;
-  created_at: string;
-};
 
 export default function LiveWalk() {
   const { bookingId } = useParams();
+  const sessionId = bookingId;
+  const navigate = useNavigate();
   const { currentUser } = useAuth();
 
-  const [latest, setLatest] = useState<Breadcrumb | null>(null);
-  const [trail, setTrail] = useState<Breadcrumb[]>([]);
+  const [session, setSession] = useState<WalkSession | null>(null);
+  const [trail, setTrail] = useState<WalkBreadcrumb[]>([]);
   const [isSharing, setIsSharing] = useState(false);
-  const intervalRef = useRef<number | null>(null);
+
+  const watchIdRef = useRef<number | null>(null);
+  const insertCooldownRef = useRef<number>(0);
 
   const isProvider = currentUser?.role === 'provider';
   const isClient = currentUser?.role === 'client';
 
   const mapSrc = useMemo(() => {
-    if (!latest) return null;
-    const lat = Number(latest.lat);
-    const lng = Number(latest.lng);
+    if (!session?.current_lat || !session?.current_lng) return null;
+    const lat = Number(session.current_lat);
+    const lng = Number(session.current_lng);
     return `https://www.google.com/maps?q=${lat},${lng}&z=16&output=embed`;
-  }, [latest]);
+  }, [session?.current_lat, session?.current_lng]);
 
+  // Initial load: session + latest breadcrumbs
   useEffect(() => {
-    if (!bookingId) return;
+    if (!sessionId) return;
 
-    const loadLatest = async () => {
-      const { data } = await supabase
-        .from('walk_breadcrumbs')
-        .select('*')
-        .eq('walk_session_id', bookingId)
-        .order('created_at', { ascending: false })
-        .limit(1);
+    const load = async () => {
+      const [{ data: s }, { data: crumbs }] = await Promise.all([
+        supabase.from('walk_sessions').select('*').eq('id', sessionId).single(),
+        supabase
+          .from('walk_breadcrumbs')
+          .select('*')
+          .eq('walk_session_id', sessionId)
+          .order('created_at', { ascending: false })
+          .limit(10),
+      ]);
 
-      const crumb = (data?.[0] || null) as Breadcrumb | null;
-      setLatest(crumb);
-      setTrail(crumb ? [crumb] : []);
+      setSession((s as any) || null);
+      setTrail(((crumbs as any) || []) as WalkBreadcrumb[]);
     };
 
-    loadLatest();
-  }, [bookingId]);
+    load();
+  }, [sessionId]);
 
-  // Client: realtime subscription for new breadcrumbs
+  // Client: subscribe to session updates (to follow the pack in real-time)
   useEffect(() => {
-    if (!bookingId || !isClient) return;
+    if (!sessionId || !isClient) return;
 
     const channel = supabase
-      .channel(`walk_breadcrumbs:${bookingId}`)
+      .channel(`walk_sessions:${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'walk_sessions',
+          filter: `id=eq.${sessionId}`,
+        },
+        (payload) => {
+          setSession(payload.new as WalkSession);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sessionId, isClient]);
+
+  // Client: also subscribe to breadcrumbs so the recent list updates
+  useEffect(() => {
+    if (!sessionId || !isClient) return;
+
+    const channel = supabase
+      .channel(`walk_breadcrumbs:${sessionId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'walk_breadcrumbs',
-          filter: `walk_session_id=eq.${bookingId}`,
+          filter: `walk_session_id=eq.${sessionId}`,
         },
         (payload) => {
-          const crumb = payload.new as Breadcrumb;
-          setLatest(crumb);
+          const crumb = payload.new as WalkBreadcrumb;
           setTrail((prev) => [crumb, ...prev].slice(0, 10));
         }
       )
@@ -80,51 +105,85 @@ export default function LiveWalk() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [bookingId, isClient]);
+  }, [sessionId, isClient]);
 
-  // Provider: push location every 10 seconds
+  const pushLocation = async (latitude: number, longitude: number) => {
+    if (!sessionId) return;
+
+    // Update the session's current position (for the client to subscribe to)
+    await supabase
+      .from('walk_sessions')
+      .update({ current_lat: latitude, current_lng: longitude })
+      .eq('id', sessionId);
+
+    // Insert breadcrumb (for history / trail)
+    await supabase.from('walk_breadcrumbs').insert({
+      walk_session_id: sessionId,
+      lat: latitude,
+      lng: longitude,
+    });
+  };
+
+  // Provider: use watchPosition while sharing
   useEffect(() => {
-    if (!bookingId || !isProvider || !isSharing) return;
+    if (!sessionId || !isProvider || !isSharing) return;
+    if (!('geolocation' in navigator)) return;
 
-    const pushOnce = async () => {
-      if (!('geolocation' in navigator)) return;
+    const now = Date.now();
+    insertCooldownRef.current = now;
 
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const { latitude, longitude } = pos.coords;
-          await supabase.from('walk_breadcrumbs').insert({
-            walk_session_id: bookingId,
-            lat: latitude,
-            lng: longitude,
-          });
-        },
-        () => {
-          // ignore (permission denied / unavailable)
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    };
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
 
-    pushOnce();
+        // Throttle to ~1 update / 5 seconds (watchPosition can be very chatty)
+        const t = Date.now();
+        if (t - insertCooldownRef.current < 5000) return;
+        insertCooldownRef.current = t;
 
-    intervalRef.current = window.setInterval(pushOnce, 10_000);
+        await pushLocation(latitude, longitude);
+        setSession((prev) => (prev ? { ...prev, current_lat: latitude, current_lng: longitude } : prev));
+      },
+      () => {
+        // ignore (permission denied / unavailable)
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
 
     return () => {
-      if (intervalRef.current) {
-        window.clearInterval(intervalRef.current);
-        intervalRef.current = null;
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
       }
     };
-  }, [bookingId, isProvider, isSharing]);
+  }, [sessionId, isProvider, isSharing]);
 
   useEffect(() => {
     return () => {
-      if (intervalRef.current) {
-        window.clearInterval(intervalRef.current);
-        intervalRef.current = null;
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
       }
     };
   }, []);
+
+  const endWalk = async () => {
+    if (!sessionId) return;
+
+    try {
+      await supabase
+        .from('walk_sessions')
+        .update({ status: 'completed', ended_at: new Date().toISOString() })
+        .eq('id', sessionId);
+
+      await supabase.from('bookings').update({ status: 'completed' }).eq('walk_session_id', sessionId);
+
+      toast({ title: 'Walk completed', description: 'The session has ended and all linked bookings were marked completed.' });
+      navigate('/provider', { replace: true });
+    } catch (e: any) {
+      toast({ title: 'Could not end walk', description: e?.message || 'Please try again.', variant: 'destructive' });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -133,12 +192,12 @@ export default function LiveWalk() {
       <main className="container mx-auto px-4 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Live Walk</h1>
-          <p className="mt-1 text-sm font-medium text-slate-600">Real-time location updates.</p>
+          <p className="mt-1 text-sm font-medium text-slate-600">Real-time pack location updates.</p>
         </div>
 
-        {!bookingId ? (
+        {!sessionId ? (
           <Card className="rounded-2xl border-slate-200">
-            <CardContent className="py-10 text-center text-sm font-medium text-slate-600">Missing booking ID.</CardContent>
+            <CardContent className="py-10 text-center text-sm font-medium text-slate-600">Missing session ID.</CardContent>
           </Card>
         ) : (
           <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
@@ -151,19 +210,23 @@ export default function LiveWalk() {
                       Map
                     </CardTitle>
                     <CardDescription>
-                      {latest ? (
+                      {session?.current_lat && session?.current_lng ? (
                         <span>
-                          Last update {format(new Date(latest.created_at), 'HH:mm:ss')} • Lat {Number(latest.lat).toFixed(5)} / Lng{' '}
-                          {Number(latest.lng).toFixed(5)}
+                          Last known • Lat {Number(session.current_lat).toFixed(5)} / Lng {Number(session.current_lng).toFixed(5)}
                         </span>
                       ) : (
                         'Waiting for the first GPS ping…'
                       )}
                     </CardDescription>
                   </div>
-                  <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
-                    {isClient ? 'Client view' : isProvider ? 'Provider view' : 'Live'}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
+                      {isClient ? 'Client view' : isProvider ? 'Provider view' : 'Live'}
+                    </Badge>
+                    {session?.status && (
+                      <Badge className="rounded-full bg-slate-100 text-slate-900 hover:bg-slate-100">{session.status}</Badge>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
@@ -176,9 +239,7 @@ export default function LiveWalk() {
                     referrerPolicy="no-referrer-when-downgrade"
                   />
                 ) : (
-                  <div className="grid h-[360px] place-items-center text-sm font-medium text-slate-600 sm:h-[460px]">
-                    No location yet.
-                  </div>
+                  <div className="grid h-[360px] place-items-center text-sm font-medium text-slate-600 sm:h-[460px]">No location yet.</div>
                 )}
               </CardContent>
             </Card>
@@ -191,7 +252,7 @@ export default function LiveWalk() {
                       <Navigation className="h-4 w-4 text-emerald-700" />
                       Share location
                     </CardTitle>
-                    <CardDescription>Pushes coordinates to the walk every 10 seconds.</CardDescription>
+                    <CardDescription>Updates the pack position live and drops breadcrumbs.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <Button
@@ -204,9 +265,21 @@ export default function LiveWalk() {
                     >
                       {isSharing ? 'Stop sharing' : 'Start sharing'}
                     </Button>
-                    <p className="text-xs font-semibold text-slate-600">
-                      Keep this tab open while walking so clients can follow live.
-                    </p>
+
+                    <Button
+                      onClick={endWalk}
+                      variant="outline"
+                      className="w-full rounded-full border-slate-200 bg-white text-slate-900 hover:bg-slate-50"
+                    >
+                      <Square className="mr-2 h-4 w-4" />
+                      End walk
+                    </Button>
+
+                    <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-100">
+                      <p className="text-xs font-semibold text-slate-700">
+                        Keep this tab open while walking so clients can follow the pack in real time.
+                      </p>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -214,7 +287,7 @@ export default function LiveWalk() {
               <Card className="rounded-2xl border-slate-200 bg-white">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-base">
-                    <MapPin className="h-4 w-4 text-blue-700" />
+                    <Users className="h-4 w-4 text-violet-700" />
                     Recent updates
                   </CardTitle>
                   <CardDescription>Latest 10 breadcrumbs</CardDescription>
@@ -236,6 +309,26 @@ export default function LiveWalk() {
                         </div>
                       ))}
                     </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl border-slate-200 bg-white">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <MapPin className="h-4 w-4 text-blue-700" />
+                    Session
+                  </CardTitle>
+                  <CardDescription>Session ID {sessionId.slice(0, 8)}…</CardDescription>
+                </CardHeader>
+                <CardContent className="text-sm font-medium text-slate-700">
+                  {session?.started_at ? (
+                    <p>
+                      Started {format(new Date(session.started_at), 'PPP p')}
+                      {session.ended_at ? ` • Ended ${format(new Date(session.ended_at), 'PPP p')}` : ''}
+                    </p>
+                  ) : (
+                    <p>—</p>
                   )}
                 </CardContent>
               </Card>

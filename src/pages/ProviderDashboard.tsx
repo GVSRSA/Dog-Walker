@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import RoleNavbar from '@/components/RoleNavbar';
+import PackWalkStarter from '@/components/PackWalkStarter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,6 +50,16 @@ const ProviderDashboard = () => {
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [location.hash]);
 
+  async function refreshBookings() {
+    if (!currentUser?.id) return;
+    const { data, error } = await fetchBookings(currentUser.id, 'provider');
+    if (error) {
+      console.error('Error fetching bookings:', error);
+      return;
+    }
+    setBookings(data || []);
+  }
+
   // Fetch bookings for provider
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
@@ -56,12 +67,7 @@ const ProviderDashboard = () => {
     const fetchProviderBookings = async () => {
       setLoadingBookings(true);
       try {
-        const { data, error } = await fetchBookings(currentUser.id, 'provider');
-        if (error) {
-          console.error('Error fetching bookings:', error);
-        } else {
-          setBookings(data || []);
-        }
+        await refreshBookings();
       } catch (err) {
         console.error('Error:', err);
       } finally {
@@ -112,10 +118,7 @@ const ProviderDashboard = () => {
         console.error('Error confirming booking:', error);
         alert('Failed to confirm booking');
       } else {
-        const { data, error: fetchError } = await fetchBookings(currentUser.id, 'provider');
-        if (!fetchError) {
-          setBookings(data || []);
-        }
+        await refreshBookings();
       }
     } catch (err) {
       console.error('Error:', err);
@@ -125,6 +128,22 @@ const ProviderDashboard = () => {
 
   const handleStartWalk = async (bookingId: string) => {
     try {
+      // If this booking is part of a pack walk, send provider to session tracking
+      const { data: bData, error: bErr } = await supabase
+        .from('bookings')
+        .select('id, walk_session_id')
+        .eq('id', bookingId)
+        .single();
+
+      if (bErr) throw bErr;
+
+      if (bData?.walk_session_id) {
+        await supabase.from('bookings').update({ status: 'in_progress' }).eq('id', bookingId);
+        await refreshBookings();
+        navigate(`/live-walk/${bData.walk_session_id}`);
+        return;
+      }
+
       const { error } = await supabase.from('bookings').update({ status: 'active' }).eq('id', bookingId);
 
       if (error) {
@@ -178,10 +197,7 @@ const ProviderDashboard = () => {
       const intervalId = setInterval(trackLocation, 10 * 1000);
       setTrackingInterval(intervalId);
 
-      const { data, error: fetchError } = await fetchBookings(currentUser.id, 'provider');
-      if (!fetchError) {
-        setBookings(data || []);
-      }
+      await refreshBookings();
     } catch (err) {
       console.error('Error:', err);
       alert('Failed to start walk');
@@ -203,11 +219,7 @@ const ProviderDashboard = () => {
       } else {
         setActiveBookingId(null);
         setIsWalking(false);
-
-        const { data, error: fetchError } = await fetchBookings(currentUser.id, 'provider');
-        if (!fetchError) {
-          setBookings(data || []);
-        }
+        await refreshBookings();
       }
     } catch (err) {
       console.error('Error:', err);
@@ -265,6 +277,7 @@ const ProviderDashboard = () => {
 
   const pendingBookings = bookings.filter((b) => b.status === 'pending');
   const confirmedBookings = bookings.filter((b) => b.status === 'confirmed');
+  const inProgressBookings = bookings.filter((b) => b.status === 'in_progress');
   const activeBookings = bookings.filter((b) => b.status === 'active');
   const completedBookings = bookings.filter((b) => b.status === 'completed');
 
@@ -334,6 +347,8 @@ const ProviderDashboard = () => {
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Bookings Section */}
           <section id="walks" className="scroll-mt-24 lg:col-span-2 space-y-6">
+            <PackWalkStarter providerId={currentUser.id} bookings={bookings} onCreated={refreshBookings} />
+
             {/* Pending Bookings */}
             <Card>
               <CardHeader>
@@ -405,6 +420,51 @@ const ProviderDashboard = () => {
                           >
                             <Play className="w-4 h-4 mr-1" />
                             Start Walk
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* In-progress pack bookings */}
+            {inProgressBookings.length > 0 && (
+              <Card className="border-violet-300 bg-violet-50">
+                <CardHeader>
+                  <CardTitle className="text-violet-900">Pack Walk (In Progress)</CardTitle>
+                  <CardDescription>These bookings are attached to an active walk session.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {inProgressBookings.map((booking) => (
+                      <div key={booking.id} className="flex items-center justify-between p-4 bg-white rounded-lg">
+                        <div>
+                          <p className="font-semibold">Client ID: {booking.client_id?.slice(0, 8)}...</p>
+                          <p className="text-sm text-gray-600">Session: {booking.walk_session_id?.slice(0, 8)}...</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {booking.walk_session_id && (
+                            <Button
+                              size="sm"
+                              onClick={() => navigate(`/live-walk/${booking.walk_session_id}`)}
+                              className="bg-violet-700 hover:bg-violet-800"
+                            >
+                              View Live
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              if (!booking.walk_session_id) return;
+                              await supabase.from('bookings').update({ status: 'completed' }).eq('id', booking.id);
+                              await refreshBookings();
+                            }}
+                            className="rounded-full"
+                          >
+                            Mark complete
                           </Button>
                         </div>
                       </div>

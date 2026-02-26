@@ -40,6 +40,8 @@ export interface Dog {
   created_at?: string;
 }
 
+export type BookingStatus = 'pending' | 'confirmed' | 'in_progress' | 'active' | 'completed' | 'cancelled';
+
 // Booking type (from Supabase bookings table)
 export interface Booking {
   id: string;
@@ -50,12 +52,33 @@ export interface Booking {
   scheduled_at?: string;
   scheduled_date?: string;
   duration?: number;
-  status?: 'pending' | 'confirmed' | 'active' | 'completed' | 'cancelled';
+  status?: BookingStatus;
   price?: number;
   total_fee?: number;
   platform_fee?: number;
   provider_payout?: number;
   created_at?: string;
+  walk_session_id?: string | null;
+}
+
+export type WalkSessionStatus = 'active' | 'completed' | 'cancelled';
+
+export interface WalkSession {
+  id: string;
+  walker_id: string;
+  status: WalkSessionStatus;
+  current_lat?: number | null;
+  current_lng?: number | null;
+  started_at?: string;
+  ended_at?: string | null;
+}
+
+export interface WalkBreadcrumb {
+  id: string;
+  walk_session_id: string;
+  lat: number;
+  lng: number;
+  created_at: string;
 }
 
 // Review type (from Supabase reviews table)

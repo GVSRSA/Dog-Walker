@@ -58,7 +58,10 @@ export default function MyBookings() {
     fetchData();
   }, [currentUser?.id]);
 
-  const active = useMemo(() => bookings.filter((b) => b.status === 'active'), [bookings]);
+  const active = useMemo(
+    () => bookings.filter((b) => b.status === 'active' || b.status === 'in_progress'),
+    [bookings]
+  );
   const upcoming = useMemo(() => bookings.filter((b) => b.status === 'pending' || b.status === 'confirmed'), [bookings]);
   const completed = useMemo(() => bookings.filter((b) => b.status === 'completed'), [bookings]);
 
@@ -86,7 +89,7 @@ export default function MyBookings() {
     const scheduled = booking.scheduled_at ? new Date(booking.scheduled_at) : null;
 
     const statusTone =
-      booking.status === 'active'
+      booking.status === 'active' || booking.status === 'in_progress'
         ? 'bg-emerald-100 text-emerald-900'
         : booking.status === 'confirmed'
           ? 'bg-blue-100 text-blue-900'
@@ -130,7 +133,13 @@ export default function MyBookings() {
             </div>
           </div>
 
-          {booking.status === 'active' && booking.id && (
+          {(booking.status === 'active' || booking.status === 'in_progress') && booking.walk_session_id && (
+            <Button asChild className="w-full rounded-full bg-emerald-700 hover:bg-emerald-800">
+              <Link to={`/live-walk/${booking.walk_session_id}`}>View live map</Link>
+            </Button>
+          )}
+
+          {booking.status === 'active' && booking.id && !booking.walk_session_id && (
             <Button asChild className="w-full rounded-full bg-emerald-700 hover:bg-emerald-800">
               <Link to={`/live-walk/${booking.id}`}>View live map</Link>
             </Button>
