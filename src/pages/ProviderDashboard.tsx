@@ -378,7 +378,10 @@ const ProviderDashboard = () => {
   const activeBookings = bookings.filter((b) => b.status === 'active');
   const completedBookings = bookings.filter((b) => b.status === 'completed');
 
-  const totalEarnings = completedBookings.reduce((sum, b) => sum + (b.provider_payout || 0), 0);
+  const totalEarnings = completedBookings.reduce((sum, b) => {
+    const fee = typeof b.total_fee === 'number' ? b.total_fee : Number(b.total_fee);
+    return sum + (Number.isFinite(fee) ? fee : 0);
+  }, 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
