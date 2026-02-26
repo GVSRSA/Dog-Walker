@@ -64,8 +64,9 @@ export default function BookingPage() {
 
   const cost = useMemo(() => {
     if (!selectedProvider) return 0;
-    const minutes = Number(duration || '60');
-    return ((selectedProvider.hourly_rate || 0) * minutes) / 60;
+    const minutes = Number.parseInt(duration || '60', 10);
+    const providerRate = Number(selectedProvider.walk_rate ?? selectedProvider.hourly_rate ?? 0);
+    return (minutes / 60) * providerRate;
   }, [selectedProvider, duration]);
 
   const handleBook = async () => {
@@ -76,7 +77,7 @@ export default function BookingPage() {
       return;
     }
 
-    // Re-check approval server-side (don’t trust stale UI data)
+    // Re-check approval server-side (don't trust stale UI data)
     const { data: provider, error: providerError } = await supabase
       .from('profiles')
       .select('is_approved,is_suspended')
@@ -102,8 +103,12 @@ export default function BookingPage() {
       return;
     }
 
-    const platformFee = cost * 0.15;
-    const providerPayout = cost - platformFee;
+    const minutes = Number.parseInt(duration || '60', 10);
+    const providerRate = Number(selectedProvider.walk_rate ?? selectedProvider.hourly_rate ?? 0);
+    const totalFee = (minutes / 60) * providerRate;
+
+    const platformFee = totalFee * 0.15;
+    const providerPayout = totalFee - platformFee;
     const scheduledAt = `${date}T${time}`;
 
     const { error: insertError } = await supabase.from('bookings').insert({
@@ -113,7 +118,8 @@ export default function BookingPage() {
       status: 'pending',
       scheduled_at: scheduledAt,
       scheduled_date: date,
-      total_fee: cost,
+      duration: minutes,
+      total_fee: totalFee,
       platform_fee: platformFee,
       provider_payout: providerPayout,
     });
@@ -186,7 +192,7 @@ export default function BookingPage() {
                       <span className="font-medium text-slate-600">({p.review_count || 0})</span>
                     </div>
                     <div className="text-sm">
-                      <span className="font-extrabold text-slate-900">R{p.hourly_rate || 0}</span>
+                      <span className="font-extrabold text-slate-900">R{p.walk_rate ?? p.hourly_rate ?? 0}</span>
                       <span className="font-medium text-slate-600">/hour</span>
                     </div>
                   </div>

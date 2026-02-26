@@ -284,9 +284,11 @@ const ClientDashboard = () => {
     }
 
     try {
+      const minutes = Number.parseInt(selectedDuration, 10);
+      const providerRate = Number(selectedProvider.walk_rate ?? selectedProvider.hourly_rate ?? 0);
+
       // Calculate fees
-      const durationHours = parseInt(selectedDuration) / 60;
-      const totalFee = (selectedProvider.hourly_rate || 0) * durationHours;
+      const totalFee = (minutes / 60) * providerRate;
       const platformFee = totalFee * 0.15;
       const providerPayout = totalFee - platformFee;
 
@@ -298,7 +300,7 @@ const ClientDashboard = () => {
         status: 'pending',
         scheduled_date: selectedDate,
         scheduled_at: `${selectedDate}T${selectedTime}`,
-        duration: parseInt(selectedDuration),
+        duration: minutes,
         total_fee: totalFee,
         platform_fee: platformFee,
         provider_payout: providerPayout,
