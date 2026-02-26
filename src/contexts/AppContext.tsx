@@ -1,15 +1,91 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import {
-  User,
-  ProviderProfile,
-  ClientProfile,
-  Booking,
-  Route,
-  RoutePoint,
-  Transaction,
-  PlatformRevenue,
-  Dog,
-} from '@/types';
+import React, { createContext, useContext, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+
+// Minimal inline types used by the AppContext to avoid depending on a separate types file.
+// These include only the fields referenced by the context implementation.
+export type User = {
+  id: string;
+  name: string;
+  email?: string;
+  role?: 'admin' | 'provider' | 'client';
+  isApproved?: boolean;
+  isSuspended?: boolean;
+  createdAt?: Date;
+  phone?: string;
+};
+
+export type ProviderProfile = User & {
+  bio?: string;
+  location?: { lat: number; lng: number; address?: string };
+  services?: string[];
+  hourlyRate?: number;
+  rating?: number;
+  totalWalks?: number;
+  availableCredits?: number;
+  availability?: { days: string[]; startTime: string; endTime: string };
+};
+
+export type ClientProfile = User & {
+  dogs?: Dog[];
+};
+
+export type Dog = {
+  id: string;
+  name: string;
+  breed?: string;
+  age?: number;
+  notes?: string;
+};
+
+export type Booking = {
+  id: string;
+  clientId: string;
+  providerId: string;
+  dogIds: string[];
+  scheduledDate: Date;
+  duration: number;
+  status: 'pending' | 'confirmed' | 'active' | 'completed' | 'cancelled';
+  price: number;
+  platformCommission?: number;
+  providerPayout?: number;
+  createdAt?: Date;
+  routeId?: string;
+};
+
+export type RoutePoint = {
+  id: string;
+  bookingId: string;
+  lat: number;
+  lng: number;
+  timestamp: Date;
+};
+
+export type Route = {
+  id: string;
+  bookingId: string;
+  providerId?: string;
+  points: RoutePoint[];
+  startTime?: Date;
+  endTime?: Date;
+};
+
+export type Transaction = {
+  id: string;
+  userId: string;
+  type: 'credit_purchase' | 'booking_fee' | string;
+  amount: number;
+  credits?: number;
+  bookingId?: string;
+  createdAt?: Date;
+  description?: string;
+};
+
+export type PlatformRevenue = {
+  totalRevenue: number;
+  totalBookings: number;
+  totalUsers: number;
+  activeProviders: number;
+};
 
 interface AppContextType {
   currentUser: (User | ProviderProfile | ClientProfile) | null;
@@ -25,10 +101,10 @@ interface AppContextType {
   approveUser: (userId: string) => void;
   suspendUser: (userId: string) => void;
   createBooking: (booking: Omit<Booking, 'id' | 'createdAt'>) => void;
-  updateBookingStatus: (bookingId: string, status: Booking['status']) => void;
+  updateBookingStatus: (bookingId: string, status: Booking['status']) => Promise<void>;
   addRoutePoint: (routeId: string, lat: number, lng: number) => void;
-  startWalk: (bookingId: string) => void;
-  endWalk: (bookingId: string) => void;
+  startWalk: (bookingId: string) => Promise<void>;
+  endWalk: (bookingId: string) => Promise<void>;
   purchaseCredits: (userId: string, amount: number, credits: number) => void;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt'>) => void;
   getProviderProfile: (providerId: string) => ProviderProfile | undefined;
@@ -157,6 +233,7 @@ const mockRoutes: Route[] = [
   {
     id: 'route-1',
     bookingId: 'booking-2',
+    providerId: 'provider-2',
     points: [
       { id: 'point-1', bookingId: 'booking-2', lat: 40.7282, lng: -73.9942, timestamp: new Date('2024-12-21T14:00:00') },
       { id: 'point-2', bookingId: 'booking-2', lat: 40.7292, lng: -73.9952, timestamp: new Date('2024-12-21T14:05:00') },
@@ -205,7 +282,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       name,
       email,
       role,
-      isApproved: role === 'client', // Clients auto-approved, providers need approval
+      isApproved: role === 'client',
       isSuspended: false,
       createdAt: new Date(),
     };
@@ -244,7 +321,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newBooking;
   };
 
-  const updateBookingStatus = (bookingId: string, status: Booking['status']) => {
+  const updateBookingStatus = async (bookingId: string, status: Booking['status']) => {
+    // Update Supabase database
+    const { error } = await supabase
+      .from('bookings')
+      .update({ status })
+      .eq('id', bookingId);
+    
+    if (error) {
+      console.error('Error updating booking status:', error);
+      throw error;
+    }
+
+    // Update local state
     setBookings(bookings.map(b => b.id === bookingId ? { ...b, status } : b));
   };
 
@@ -260,10 +349,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setRoutes(routes.map(r => r.id === routeId ? { ...r, points: [...r.points, newPoint] } : r));
   };
 
-  const startWalk = (bookingId: string) => {
+  const startWalk = async (bookingId: string) => {
+    // Update booking status to active in Supabase
+    const { error: bookingError } = await supabase
+      .from('bookings')
+      .update({ status: 'active' })
+      .eq('id', bookingId);
+
+    if (bookingError) {
+      console.error('Error starting walk:', bookingError);
+      throw bookingError;
+    }
+
+    // Create initial tracking log in Supabase (using default location)
+    const { error: trackingError } = await supabase
+      .from('tracking_logs')
+      .insert({
+        booking_id: bookingId,
+        location: `(${40.7128},${-74.0060})`,
+      });
+
+    if (trackingError) {
+      console.error('Error creating tracking log:', trackingError);
+    }
+
+    // Update local state
     const newRoute: Route = {
       id: `route-${Date.now()}`,
       bookingId,
+      providerId: bookings.find(b => b.id === bookingId)?.providerId,
       points: [],
       startTime: new Date(),
     };
@@ -271,7 +385,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setBookings(bookings.map(b => b.id === bookingId ? { ...b, status: 'active', routeId: newRoute.id } : b));
   };
 
-  const endWalk = (bookingId: string) => {
+  const endWalk = async (bookingId: string) => {
+    // Update booking status to completed in Supabase
+    const { error } = await supabase
+      .from('bookings')
+      .update({ status: 'completed' })
+      .eq('id', bookingId);
+
+    if (error) {
+      console.error('Error ending walk:', error);
+      throw error;
+    }
+
+    // Update local state
     const booking = bookings.find(b => b.id === bookingId);
     if (booking?.routeId) {
       setRoutes(routes.map(r => r.id === booking.routeId ? { ...r, endTime: new Date() } : r));

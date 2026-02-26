@@ -30,34 +30,40 @@ const ProviderDashboard = () => {
     navigate('/');
   };
 
-  const handleStartWalk = (bookingId: string) => {
-    startWalk(bookingId);
-    setActiveBooking(bookingId);
-    setIsWalking(true);
-    updateBookingStatus(bookingId, 'active');
-    
-    // Simulate GPS tracking
-    const route = routes.find(r => r.bookingId === bookingId);
-    if (route) {
-      const interval = setInterval(() => {
-        const route = routes.find(r => r.bookingId === bookingId);
-        if (route && isWalking) {
-          const lastPoint = route.points[route.points.length - 1];
-          const newLat = lastPoint ? lastPoint.lat + (Math.random() - 0.5) * 0.001 : 40.7128;
-          const newLng = lastPoint ? lastPoint.lng + (Math.random() - 0.5) * 0.001 : -74.0060;
-          useApp().addRoutePoint(route.id, newLat, newLng);
-        } else {
-          clearInterval(interval);
-        }
-      }, 5000);
+  const handleStartWalk = async (bookingId: string) => {
+    try {
+      await startWalk(bookingId);
+      setActiveBooking(bookingId);
+      setIsWalking(true);
+      
+      // Simulate GPS tracking
+      const route = routes.find(r => r.bookingId === bookingId);
+      if (route) {
+        const interval = setInterval(() => {
+          const route = routes.find(r => r.bookingId === bookingId);
+          if (route && isWalking) {
+            const lastPoint = route.points[route.points.length - 1];
+            const newLat = lastPoint ? lastPoint.lat + (Math.random() - 0.5) * 0.001 : 40.7128;
+            const newLng = lastPoint ? lastPoint.lng + (Math.random() - 0.5) * 0.001 : -74.0060;
+            useApp().addRoutePoint(route.id, newLat, newLng);
+          } else {
+            clearInterval(interval);
+          }
+        }, 5000);
+      }
+    } catch (error) {
+      console.error('Failed to start walk:', error);
     }
   };
 
-  const handleEndWalk = (bookingId: string) => {
-    endWalk(bookingId);
-    setActiveBooking(null);
-    setIsWalking(false);
-    updateBookingStatus(bookingId, 'completed');
+  const handleEndWalk = async (bookingId: string) => {
+    try {
+      await endWalk(bookingId);
+      setActiveBooking(null);
+      setIsWalking(false);
+    } catch (error) {
+      console.error('Failed to end walk:', error);
+    }
   };
 
   const handlePurchaseCredits = () => {
