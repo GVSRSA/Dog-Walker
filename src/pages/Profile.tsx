@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 const Profile = () => {
-  const { currentUser, updateProfile, addDog, removeDog } = useApp();
+  const { currentUser, updateProfile, addDog, removeDog, getReviews, getAverageRating, users } = useApp();
   const { logout } = useAuth();
   const navigate = useNavigate();
 
@@ -31,6 +31,10 @@ const Profile = () => {
     weight: 0,
     notes: '',
   });
+
+  // Get reviews for the current user
+  const myReviews = currentUser ? getReviews(currentUser.id) : [];
+  const averageRating = currentUser ? getAverageRating(currentUser.id) : 0;
 
   // Form state for different user types
   const [formData, setFormData] = useState({
@@ -661,6 +665,84 @@ const Profile = () => {
             </Card>
           </div>
         </div>
+
+        {/* Reviews Card */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Reviews</CardTitle>
+            <CardDescription>What others say about you</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {myReviews.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50 rounded-lg">
+                <Star className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-600">No reviews yet</p>
+                <p className="text-sm text-gray-500 mt-1">Complete bookings to receive reviews from others</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Rating Summary */}
+                <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star
+                        key={star}
+                        className={`w-6 h-6 ${
+                          star <= Math.round(averageRating)
+                            ? 'fill-amber-500 text-amber-500'
+                            : 'text-gray-300'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-gray-900">{averageRating.toFixed(1)}</p>
+                    <p className="text-sm text-gray-600">{myReviews.length} review{myReviews.length !== 1 ? 's' : ''}</p>
+                  </div>
+                </div>
+
+                {/* Reviews List */}
+                <div className="space-y-4">
+                  {myReviews.map((review) => {
+                    const reviewer = users.find(u => u.id === review.fromUserId);
+                    return (
+                      <div key={review.id} className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center">
+                              <User className="w-5 h-5 text-white" />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-gray-900">{reviewer?.name || 'Anonymous'}</p>
+                              <p className="text-xs text-gray-500">
+                                {review.createdAt ? new Date(review.createdAt).toLocaleDateString() : 'N/A'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                className={`w-4 h-4 ${
+                                  star <= review.rating
+                                    ? 'fill-amber-500 text-amber-500'
+                                    : 'text-gray-300'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        {review.comment && (
+                          <p className="text-gray-700 text-sm leading-relaxed">{review.comment}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Add Dog Modal */}
