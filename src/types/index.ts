@@ -34,6 +34,7 @@ export interface Dog {
   weight?: number;
   energy_level?: 'low' | 'medium' | 'high';
   special_instructions?: string;
+  image_url?: string;
   created_at?: string;
 }
 

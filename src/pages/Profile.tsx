@@ -30,6 +30,7 @@ const Profile = () => {
   const [reviews, setReviews] = useState<any[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [addDogStatus, setAddDogStatus] = useState<'success' | 'error' | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   
   const [newDog, setNewDog] = useState({
     name: '',
@@ -37,7 +38,10 @@ const Profile = () => {
     age: 0,
     weight: 0,
     special_instructions: '',
+    image_url: '',
   });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -130,9 +134,50 @@ const Profile = () => {
     }
 
     setAddDogStatus(null);
+    setUploadingImage(true);
 
-    // Prepare the dog object with proper type conversions
-    // Note: weight is stored as TEXT in the database, so we convert to string
+    let imageUrl = '';
+
+    // Upload image if one is selected
+    if (imageFile) {
+      try {
+        console.log('[handleAddDog] Uploading image to Supabase Storage...');
+        
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `${profile!.id}/${fileName}`;
+
+        const { error: uploadError, data: uploadData } = await supabase.storage
+          .from('dog-photos')
+          .upload(filePath, imageFile);
+
+        if (uploadError) {
+          console.error('[handleAddDog] Image upload failed:', uploadError);
+          setAddDogStatus('error');
+          alert('Failed to upload image. Please try again.');
+          setUploadingImage(false);
+          return;
+        }
+
+        console.log('[handleAddDog] Image uploaded successfully:', uploadData);
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('dog-photos')
+          .getPublicUrl(filePath);
+
+        imageUrl = publicUrl;
+        console.log('[handleAddDog] Image public URL:', imageUrl);
+      } catch (err) {
+        console.error('[handleAddDog] Error uploading image:', err);
+        setAddDogStatus('error');
+        alert('Failed to upload image. Please try again.');
+        setUploadingImage(false);
+        return;
+      }
+    }
+
+    // Prepare to dog object with proper type conversions
     const dogData = {
       owner_id: profile!.id,
       name: newDog.name,
@@ -140,11 +185,13 @@ const Profile = () => {
       age: Number(newDog.age) || 0,
       weight: String(Number(newDog.weight) || 0), // Convert to string for DB TEXT column
       special_instructions: newDog.special_instructions || '',
+      image_url: imageUrl || null,
     };
 
     console.log('[handleAddDog] Attempting to add dog with data:', dogData);
     console.log('[handleAddDog] Age type:', typeof dogData.age, 'Value:', dogData.age);
     console.log('[handleAddDog] Weight type:', typeof dogData.weight, 'Value:', dogData.weight);
+    console.log('[handleAddDog] Image URL:', dogData.image_url);
 
     try {
       const { error, data } = await supabase
@@ -163,14 +210,18 @@ const Profile = () => {
         });
         setAddDogStatus('error');
         alert(`Failed to add dog: ${error.message}`);
+        setUploadingImage(false);
         return;
       }
 
       console.log('[handleAddDog] Dog added successfully:', data);
       
-      setNewDog({ name: '', breed: '', age: 0, weight: 0, special_instructions: '' });
+      setNewDog({ name: '', breed: '', age: 0, weight: 0, special_instructions: '', image_url: '' });
+      setImageFile(null);
+      setImagePreview('');
       setShowAddDogModal(false);
       setAddDogStatus('success');
+      setUploadingImage(false);
       
       // Refresh dogs
       const { data: dogsData } = await supabase
@@ -184,8 +235,40 @@ const Profile = () => {
     } catch (err) {
       console.error('[handleAddDog] Unexpected error:', err);
       setAddDogStatus('error');
+      setUploadingImage(false);
       alert('Failed to add dog. Please try again.');
     }
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file (JPG, PNG, etc.)');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image must be less than 5MB');
+      return;
+    }
+
+    setImageFile(file);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview('');
   };
 
   const handleRemoveDog = async (dogId: string) => {
@@ -304,9 +387,17 @@ const Profile = () => {
               {dogs.map((dog) => (
                 <div key={dog.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                      <DogIcon className="w-6 h-6 text-blue-600" />
-                    </div>
+                    {dog.image_url ? (
+                      <img
+                        src={dog.image_url}
+                        alt={dog.name}
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <DogIcon className="w-6 h-6 text-blue-600" />
+                      </div>
+                    )}
                     <div>
                       <p className="font-semibold text-gray-900">{dog.name}</p>
                       <p className="text-sm text-gray-600">{dog.breed} {dog.age > 0 && `• ${dog.age} years old`}</p>
@@ -767,6 +858,43 @@ const Profile = () => {
                   onChange={(e) => setNewDog({ ...newDog, breed: e.target.value })}
                 />
               </div>
+
+              {/* Image Upload */}
+              <div>
+                <Label htmlFor="dog-image">Photo</Label>
+                {imagePreview ? (
+                  <div className="mt-2">
+                    <div className="relative inline-block">
+                      <img
+                        src={imagePreview}
+                        alt="Dog preview"
+                        className="w-32 h-32 object-cover rounded-lg border-2 border-green-200"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        onClick={handleRemoveImage}
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-2">
+                    <Input
+                      id="dog-image"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="cursor-pointer"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">JPG, PNG up to 5MB</p>
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="dog-age">Age (years)</Label>
@@ -807,18 +935,21 @@ const Profile = () => {
                   variant="outline"
                   onClick={() => {
                     setShowAddDogModal(false);
-                    setNewDog({ name: '', breed: '', age: 0, weight: 0, special_instructions: '' });
+                    setNewDog({ name: '', breed: '', age: 0, weight: 0, special_instructions: '', image_url: '' });
+                    setImageFile(null);
+                    setImagePreview('');
                   }}
+                  disabled={uploadingImage}
                   className="flex-1 text-green-700 border-green-300 hover:bg-green-50"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleAddDog}
-                  disabled={!newDog.name || !newDog.breed}
+                  disabled={!newDog.name || !newDog.breed || uploadingImage}
                   className="flex-1 bg-green-700 hover:bg-green-800"
                 >
-                  Add Dog
+                  {uploadingImage ? 'Adding...' : 'Add Dog'}
                 </Button>
               </div>
             </div>
