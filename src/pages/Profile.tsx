@@ -39,6 +39,7 @@ const Profile = () => {
     phone: '',
     bio: '',
     location: { lat: 0, lng: 0, address: '' },
+    neighborhood: '',
     hourlyRate: 0,
     services: [] as string[],
     availableCredits: 0,
@@ -56,6 +57,7 @@ const Profile = () => {
         phone: (currentUser as any).phone || '',
         bio: (currentUser as any).bio || '',
         location: (currentUser as any).location || { lat: 0, lng: 0, address: '' },
+        neighborhood: (currentUser as any).neighborhood || '',
         hourlyRate: (currentUser as any).hourlyRate || 0,
         services: (currentUser as any).services || [],
         availableCredits: (currentUser as any).availableCredits || 0,
@@ -171,6 +173,20 @@ const Profile = () => {
             />
           ) : (
             <p className="text-sm text-gray-600 mt-1">{formData.location?.address || 'Not provided'}</p>
+          )}
+        </div>
+
+        <div>
+          <Label htmlFor="client-neighborhood">Neighborhood/Suburb</Label>
+          {isEditing ? (
+            <Input
+              id="client-neighborhood"
+              placeholder="e.g., Sandton, Sea Point"
+              value={formData.neighborhood || ''}
+              onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
+            />
+          ) : (
+            <p className="text-sm text-gray-600 mt-1">{formData.neighborhood || 'Not provided'}</p>
           )}
         </div>
 
@@ -307,6 +323,20 @@ const Profile = () => {
         </div>
 
         <div>
+          <Label htmlFor="provider-neighborhood">Neighborhood/Suburb</Label>
+          {isEditing ? (
+            <Input
+              id="provider-neighborhood"
+              placeholder="e.g., Sandton, Sea Point"
+              value={formData.neighborhood || ''}
+              onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
+            />
+          ) : (
+            <p className="text-sm text-gray-600 mt-1">{formData.neighborhood || 'Not provided'}</p>
+          )}
+        </div>
+
+        <div>
           <Label htmlFor="provider-hourly-rate">Hourly Rate (R)</Label>
           {isEditing ? (
             <Input
@@ -438,6 +468,20 @@ const Profile = () => {
             />
           ) : (
             <p className="text-sm text-gray-600 mt-1">{(currentUser as any).phone || 'Not provided'}</p>
+          )}
+        </div>
+
+        <div>
+          <Label htmlFor="admin-neighborhood">Neighborhood/Suburb</Label>
+          {isEditing ? (
+            <Input
+              id="admin-neighborhood"
+              placeholder="e.g., Sandton, Sea Point"
+              value={formData.neighborhood || ''}
+              onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
+            />
+          ) : (
+            <p className="text-sm text-gray-600 mt-1">{formData.neighborhood || 'Not provided'}</p>
           )}
         </div>
 

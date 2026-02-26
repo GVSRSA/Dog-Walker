@@ -22,6 +22,7 @@ const ProviderDashboard = () => {
   const [isWalking, setIsWalking] = useState(false);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [creditAmount, setCreditAmount] = useState(10);
+  const [watchId, setWatchId] = useState<number | null>(null);
 
   const provider = currentUser as any;
 
@@ -44,7 +45,37 @@ const ProviderDashboard = () => {
       setActiveBooking(bookingId);
       setIsWalking(true);
       
-      // Simulate GPS tracking
+      // Start geolocation tracking
+      if ('geolocation' in navigator) {
+        const id = navigator.geolocation.watchPosition(
+          async (position) => {
+            const { latitude, longitude } = position.coords;
+            // Add route point
+            const route = routes.find(r => r.bookingId === bookingId);
+            if (route) {
+              useApp().addRoutePoint(route.id, latitude, longitude);
+              
+              // In production, this would send to Supabase tracking_logs table
+              // await supabase.from('tracking_logs').insert({
+              //   booking_id: bookingId,
+              //   location: `(${latitude},${longitude})`,
+              //   timestamp: new Date().toISOString(),
+              // });
+            }
+          },
+          (error) => {
+            console.error('Geolocation error:', error);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0,
+          }
+        );
+        setWatchId(id);
+      }
+      
+      // Simulate GPS tracking as fallback
       const route = routes.find(r => r.bookingId === bookingId);
       if (route) {
         const interval = setInterval(() => {
@@ -57,7 +88,7 @@ const ProviderDashboard = () => {
           } else {
             clearInterval(interval);
           }
-        }, 5000);
+        }, 30000); // Every 30 seconds
       }
     } catch (error) {
       console.error('Failed to start walk:', error);
@@ -66,6 +97,12 @@ const ProviderDashboard = () => {
 
   const handleEndWalk = async (bookingId: string) => {
     try {
+      // Stop geolocation tracking
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        setWatchId(null);
+      }
+      
       await endWalk(bookingId);
       setActiveBooking(null);
       setIsWalking(false);

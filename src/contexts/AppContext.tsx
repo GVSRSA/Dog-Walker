@@ -12,6 +12,7 @@ export type User = {
   isSuspended?: boolean;
   createdAt?: Date;
   phone?: string;
+  neighborhood?: string;
 };
 
 export type ProviderProfile = User & {
@@ -36,6 +37,16 @@ export type Dog = {
   age?: number;
   weight?: number;
   notes?: string;
+};
+
+export type Review = {
+  id: string;
+  bookingId: string;
+  fromUserId: string;
+  toUserId: string;
+  rating: number;
+  comment: string;
+  createdAt: Date;
 };
 
 export type Booking = {
@@ -95,6 +106,7 @@ interface AppContextType {
   bookings: Booking[];
   routes: Route[];
   transactions: Transaction[];
+  reviews: Review[];
   platformRevenue: PlatformRevenue;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -113,6 +125,9 @@ interface AppContextType {
   updateProfile: (userId: string, updates: Partial<User | ProviderProfile | ClientProfile>) => void;
   addDog: (clientId: string, dog: Omit<Dog, 'id'>) => void;
   removeDog: (clientId: string, dogId: string) => void;
+  submitReview: (review: Omit<Review, 'id' | 'createdAt'>) => void;
+  getReviews: (userId: string) => Review[];
+  getAverageRating: (userId: string) => number;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -134,6 +149,7 @@ const mockUsers: (User | ProviderProfile | ClientProfile)[] = [
     email: 'sarah@paws.com',
     role: 'provider',
     phone: '+27 82 123 4567',
+    neighborhood: 'Sandton',
     bio: 'Experienced dog walker with 5+ years of experience. Certified pet first aid.',
     location: { lat: -26.2041, lng: 28.0473, address: 'Johannesburg, Gauteng' },
     services: ['Walking', 'Pet Sitting', 'Training'],
@@ -152,6 +168,7 @@ const mockUsers: (User | ProviderProfile | ClientProfile)[] = [
     email: 'mike@paws.com',
     role: 'provider',
     phone: '+27 83 456 7890',
+    neighborhood: 'Sea Point',
     bio: 'Dog lover specializing in large breeds. Professional walker since 2020.',
     location: { lat: -33.9249, lng: 18.4241, address: 'Cape Town, Western Cape' },
     services: ['Walking', 'Running with Dogs'],
@@ -170,6 +187,7 @@ const mockUsers: (User | ProviderProfile | ClientProfile)[] = [
     email: 'emily@paws.com',
     role: 'client',
     phone: '+27 71 234 5678',
+    neighborhood: 'Rosebank',
     dogs: [
       { id: 'dog-1', name: 'Max', breed: 'Golden Retriever', age: 3, notes: 'Very friendly, loves to play fetch' },
       { id: 'dog-2', name: 'Bella', breed: 'Labrador', age: 2, notes: 'Energetic, needs longer walks' },
@@ -184,6 +202,7 @@ const mockUsers: (User | ProviderProfile | ClientProfile)[] = [
     email: 'james@paws.com',
     role: 'client',
     phone: '+27 72 345 6789',
+    neighborhood: 'Green Point',
     dogs: [{ id: 'dog-3', name: 'Rocky', breed: 'Bulldog', age: 4, notes: 'Short walks preferred due to breathing' }],
     isApproved: true,
     isSuspended: false,
@@ -254,12 +273,34 @@ const mockTransactions: Transaction[] = [
   { id: 'trans-3', userId: 'provider-2', type: 'credit_purchase', amount: 250, credits: 5, createdAt: new Date('2024-12-18'), description: 'Purchased 5 credits' },
 ];
 
+const mockReviews: Review[] = [
+  {
+    id: 'review-1',
+    bookingId: 'booking-1',
+    fromUserId: 'client-1',
+    toUserId: 'provider-1',
+    rating: 5,
+    comment: 'Excellent service! Sarah was very professional and my dogs loved her.',
+    createdAt: new Date('2024-12-20'),
+  },
+  {
+    id: 'review-2',
+    bookingId: 'booking-1',
+    fromUserId: 'provider-1',
+    toUserId: 'client-1',
+    rating: 5,
+    comment: 'Great client! Dogs were well-behaved and easy to walk.',
+    createdAt: new Date('2024-12-20'),
+  },
+];
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<(User | ProviderProfile | ClientProfile) | null>(null);
   const [users, setUsers] = useState<(User | ProviderProfile | ClientProfile)[]>(mockUsers);
   const [bookings, setBookings] = useState<Booking[]>(mockBookings);
   const [routes, setRoutes] = useState<Route[]>(mockRoutes);
   const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
+  const [reviews, setReviews] = useState<Review[]>(mockReviews);
 
   const platformRevenue: PlatformRevenue = {
     totalRevenue: mockTransactions.filter(t => t.type === 'booking_fee').reduce((sum, t) => sum + t.amount * 0.25, 0),
@@ -455,12 +496,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return users.find(u => u.id === providerId && u.role === 'provider') as ProviderProfile;
   };
 
-  const updateProfile = (userId: string, updates: Partial<User | ProviderProfile | ClientProfile>) => {
-    setUsers(users.map(u => u.id === userId ? { ...u, ...updates } : u));
-    // Also update current user if it's the same user
-    if (currentUser && currentUser.id === userId) {
-      setCurrentUser({ ...currentUser, ...updates });
+  const submitReview = (review: Omit<Review, 'id' | 'createdAt'>) => {
+    const newReview: Review = {
+      ...review,
+      id: `review-${Date.now()}`,
+      createdAt: new Date(),
+    };
+    setReviews([...reviews, newReview]);
+
+    // Update the recipient's rating
+    const recipient = users.find(u => u.id === review.toUserId);
+    if (recipient) {
+      const userReviews = getReviews(review.toUserId);
+      const avgRating = userReviews.length > 0 
+        ? userReviews.reduce((sum, r) => sum + r.rating, 0) / userReviews.length
+        : 0;
+      
+      setUsers(users.map(u => 
+        u.id === review.toUserId 
+          ? { ...u, rating: Math.round(avgRating * 10) / 10 }
+          : u
+      ));
     }
+  };
+
+  const getReviews = (userId: string): Review[] => {
+    return reviews.filter(r => r.toUserId === userId);
+  };
+
+  const getAverageRating = (userId: string): number => {
+    const userReviews = getReviews(userId);
+    if (userReviews.length === 0) return 0;
+    const avgRating = userReviews.reduce((sum, r) => sum + r.rating, 0) / userReviews.length;
+    return Math.round(avgRating * 10) / 10;
   };
 
   const addDog = (clientId: string, dog: Omit<Dog, 'id'>) => {
@@ -516,6 +584,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         bookings,
         routes,
         transactions,
+        reviews,
         platformRevenue,
         login,
         logout,
@@ -534,6 +603,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateProfile,
         addDog,
         removeDog,
+        submitReview,
+        getReviews,
+        getAverageRating,
       }}
     >
       {children}

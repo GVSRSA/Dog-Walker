@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RatingModal } from '@/components/RatingModal';
 import { useApp } from '@/contexts/AppContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
@@ -28,6 +29,8 @@ const ClientDashboard = () => {
   const [selectedDuration, setSelectedDuration] = useState('60');
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [viewingRoute, setViewingRoute] = useState<string | null>(null);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [ratingBooking, setRatingBooking] = useState<any>(null);
 
   const client = currentUser as any;
 
