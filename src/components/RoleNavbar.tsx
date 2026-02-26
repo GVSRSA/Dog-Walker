@@ -35,29 +35,26 @@ export default function RoleNavbar({ activeKey }: RoleNavbarProps) {
 
   const role = currentUser?.role;
 
-  let items: NavItem[] = [];
+  let roleItems: NavItem[] = [];
   if (role === 'admin') {
-    items = [
+    roleItems = [
       { key: 'users', label: 'Users', to: '/admin?tab=users', icon: Users },
       { key: 'dogs', label: 'Dogs', to: '/admin?tab=dogs', icon: Bone },
       { key: 'bookings', label: 'Bookings', to: '/admin?tab=bookings', icon: ClipboardList },
     ];
   } else if (role === 'client') {
-    items = [
+    roleItems = [
       { key: 'dogs', label: 'My Dogs', to: '/my-dogs', icon: PawPrint },
       { key: 'bookings', label: 'My Bookings', to: '/my-bookings', icon: CalendarDays },
       { key: 'find', label: 'Book', to: '/book', icon: Search },
     ];
   } else if (role === 'provider') {
-    items = [
+    roleItems = [
       { key: 'walks', label: 'My Walks', to: '/provider#walks', icon: ClipboardList },
       { key: 'schedule', label: 'Schedule', to: '/provider#schedule', icon: Clock3 },
       { key: 'earnings', label: 'Earnings', to: '/provider#earnings', icon: HandCoins },
     ];
   }
-
-  // Always show Profile/Settings for every role (including admin, client, provider)
-  items = [...items, { key: 'profile', label: 'Profile', to: '/profile', icon: UserRound }];
 
   const onLogout = async () => {
     await logout();
@@ -69,6 +66,28 @@ export default function RoleNavbar({ activeKey }: RoleNavbarProps) {
     if (`${location.pathname}${location.search}${location.hash}` !== target) {
       navigate(target);
     }
+  };
+
+  const PillLink = ({ item }: { item: NavItem }) => {
+    const Icon = item.icon;
+    const isActive = activeKey ? activeKey === item.key : false;
+
+    return (
+      <Button
+        asChild
+        size="sm"
+        variant="ghost"
+        className={cn(
+          'shrink-0 rounded-full px-3 text-slate-700 hover:bg-green-50 hover:text-green-900',
+          isActive && 'bg-green-100 text-green-900 hover:bg-green-100'
+        )}
+      >
+        <Link to={item.to}>
+          <Icon className="mr-2 h-4 w-4" />
+          <span className="hidden sm:inline">{item.label}</span>
+        </Link>
+      </Button>
+    );
   };
 
   return (
@@ -90,39 +109,26 @@ export default function RoleNavbar({ activeKey }: RoleNavbarProps) {
             </span>
           </button>
 
-          <nav className="flex items-center gap-2">
-            {items.map((item) => {
-              const isActive = activeKey ? activeKey === item.key : false;
-              const Icon = item.icon;
-              return (
-                <Button
-                  key={item.key}
-                  asChild
-                  size="sm"
-                  variant="ghost"
-                  className={cn(
-                    'rounded-full px-3 text-slate-700 hover:bg-green-50 hover:text-green-900',
-                    isActive && 'bg-green-100 text-green-900 hover:bg-green-100'
-                  )}
-                >
-                  <Link to={item.to}>
-                    <Icon className="mr-2 h-4 w-4" />
-                    {item.label}
-                  </Link>
-                </Button>
-              );
-            })}
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+            <nav className="flex min-w-0 flex-1 justify-end gap-2 overflow-x-auto py-1 pr-1">
+              {roleItems.map((item) => (
+                <PillLink key={item.key} item={item} />
+              ))}
+            </nav>
+
+            {/* Always visible (pinned) */}
+            <PillLink item={{ key: 'profile', label: 'Profile', to: '/profile', icon: UserRound }} />
 
             <Button
               size="sm"
               variant="ghost"
               onClick={onLogout}
-              className="rounded-full px-3 text-slate-700 hover:bg-rose-50 hover:text-rose-700"
+              className="shrink-0 rounded-full px-3 text-slate-700 hover:bg-rose-50 hover:text-rose-700"
             >
               <LogOut className="mr-2 h-4 w-4" />
-              Logout
+              <span className="hidden sm:inline">Logout</span>
             </Button>
-          </nav>
+          </div>
         </div>
       </div>
     </header>
