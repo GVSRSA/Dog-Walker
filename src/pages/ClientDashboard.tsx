@@ -406,9 +406,9 @@ const ClientDashboard = () => {
                       <div>
                         <p className="font-semibold text-gray-900">{provider?.full_name}</p>
                         <p className="text-sm text-gray-600">
-                          {format(new Date(booking.scheduled_date), 'PPP')} at {format(new Date(booking.scheduled_date), 'HH:mm')}
+                          {booking.scheduled_at && format(new Date(booking.scheduled_at), 'PPP')} at {booking.scheduled_at && format(new Date(booking.scheduled_at), 'HH:mm')}
                         </p>
-                        <p className="text-sm text-gray-600">{booking.duration} min • R{booking.price.toFixed(2)}</p>
+                        <p className="text-sm text-gray-600">• R{booking.total_fee?.toFixed(2) || 'N/A'}</p>
                       </div>
                     </div>
                     <Button
@@ -442,9 +442,9 @@ const ClientDashboard = () => {
                       <div>
                         <p className="font-semibold">{provider?.full_name}</p>
                         <p className="text-sm text-gray-600">
-                          {format(new Date(booking.scheduled_date), 'PPP')} at {format(new Date(booking.scheduled_date), 'HH:mm')}
+                          {booking.scheduled_at && format(new Date(booking.scheduled_at), 'PPP')} at {booking.scheduled_at && format(new Date(booking.scheduled_at), 'HH:mm')}
                         </p>
-                        <p className="text-sm text-gray-600">{booking.duration} min • R{booking.price.toFixed(2)}</p>
+                        <p className="text-sm text-gray-600">• R{booking.total_fee?.toFixed(2) || 'N/A'}</p>
                       </div>
                       <Button
                         size="sm"

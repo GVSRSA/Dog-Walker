@@ -359,12 +359,11 @@ const ProviderDashboard = () => {
                         <div>
                           <p className="font-semibold">Client ID: {booking.client_id.slice(0, 8)}...</p>
                           <p className="text-sm text-gray-600">
-                            {format(new Date(booking.scheduled_date), 'PPP')} at {format(new Date(booking.scheduled_date), 'HH:mm')}
+                            {booking.scheduled_at && format(new Date(booking.scheduled_at), 'PPP')} at {booking.scheduled_at && format(new Date(booking.scheduled_at), 'HH:mm')}
                           </p>
-                          <p className="text-sm text-gray-600">{booking.duration} minutes</p>
                         </div>
                         <div className="flex items-center gap-4">
-                          <p className="font-bold text-green-700">R{booking.price.toFixed(2)}</p>
+                          <p className="font-bold text-green-700">R{booking.total_fee?.toFixed(2) || 'N/A'}</p>
                           <Button
                             size="sm"
                             onClick={() => handleConfirmBooking(booking.id)}
@@ -395,12 +394,11 @@ const ProviderDashboard = () => {
                         <div>
                           <p className="font-semibold">Client ID: {booking.client_id.slice(0, 8)}...</p>
                           <p className="text-sm text-gray-600">
-                            {format(new Date(booking.scheduled_date), 'PPP')} at {format(new Date(booking.scheduled_date), 'HH:mm')}
+                            {booking.scheduled_at && format(new Date(booking.scheduled_at), 'PPP')} at {booking.scheduled_at && format(new Date(booking.scheduled_at), 'HH:mm')}
                           </p>
-                          <p className="text-sm text-gray-600">{booking.duration} minutes</p>
                         </div>
                         <div className="flex items-center gap-4">
-                          <p className="font-bold text-green-700">R{booking.price.toFixed(2)}</p>
+                          <p className="font-bold text-green-700">R{booking.total_fee?.toFixed(2) || 'N/A'}</p>
                           <Button
                             size="sm"
                             onClick={() => handleStartWalk(booking.id)}
@@ -475,9 +473,9 @@ const ProviderDashboard = () => {
                     <TableBody>
                       {[...completedBookings, ...bookings.filter(b => b.status === 'cancelled')].map((booking) => (
                         <TableRow key={booking.id}>
-                          <TableCell className="font-medium">ID: {booking.client_id.slice(0, 8)}...</TableCell>
-                          <TableCell>{format(new Date(booking.scheduled_date), 'PPP')}</TableCell>
-                          <TableCell>{booking.duration} min</TableCell>
+                          <TableCell className="font-medium">ID: {booking.client_id?.slice(0, 8)}...</TableCell>
+                          <TableCell>{booking.scheduled_at && format(new Date(booking.scheduled_at), 'PPP')}</TableCell>
+                          <TableCell>-</TableCell>
                           <TableCell>R{booking.provider_payout?.toFixed(2) || '0.00'}</TableCell>
                           <TableCell>
                             <Badge variant={

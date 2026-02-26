@@ -101,6 +101,11 @@ const Login = () => {
               Sign up
             </Link>
           </div>
+          <div className="mt-4 text-center text-sm">
+            <Link to="/" className="text-gray-600 hover:text-green-700 font-medium">
+              ← Back to Home
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>

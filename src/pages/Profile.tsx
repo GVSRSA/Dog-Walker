@@ -510,14 +510,14 @@ const Profile = () => {
                   <User className="w-10 h-10 text-white" />
                 </div>
                 <CardTitle className="text-center">{profile?.full_name}</CardTitle>
-                <CardDescription className="text-center">
+                <div className="text-center">
                   <Badge variant={
-                    profile?.role === 'admin' ? 'default' : 
+                    profile?.role === 'admin' ? 'default' :
                     profile?.role === 'provider' ? 'secondary' : 'outline'
                   }>
                     {profile?.role?.toUpperCase()}
                   </Badge>
-                </CardDescription>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-3 text-sm">
@@ -585,31 +585,33 @@ const Profile = () => {
             </Card>
 
             {/* Account Status Card */}
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>Account Status</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Shield className="w-5 h-5 text-green-600" />
-                    <div>
-                      <p className="font-medium">Account Status</p>
-                      <p className="text-sm text-gray-600">
-                        {profile?.is_approved ? (
-                          <span className="text-green-600">Active and Approved</span>
-                        ) : (
-                          <span className="text-amber-600">Pending Approval</span>
-                        )}
-                      </p>
+            {profile?.role !== 'admin' && (
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle>Account Status</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Shield className="w-5 h-5 text-green-600" />
+                      <div>
+                        <p className="font-medium">Account Status</p>
+                        <p className="text-sm text-gray-600">
+                          {profile?.is_approved ? (
+                            <span className="text-green-600">Active and Approved</span>
+                          ) : (
+                            <span className="text-amber-600">Pending Approval</span>
+                          )}
+                        </p>
+                      </div>
                     </div>
+                    {profile?.is_suspended && (
+                      <Badge variant="destructive">Suspended</Badge>
+                    )}
                   </div>
-                  {profile?.is_suspended && (
-                    <Badge variant="destructive">Suspended</Badge>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
 

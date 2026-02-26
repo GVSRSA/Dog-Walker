@@ -50,14 +50,14 @@ const AdminDashboard = () => {
   }, []);
 
   // Fetch all bookings
-  useEffect(() => {
-    const fetchAllBookings = async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('bookings')
-          .select('*')
-          .order('scheduled_date', { ascending: false });
+useEffect(() => {
+  const fetchAllBookings = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('*')
+        .order('scheduled_at', { ascending: false });
         
         if (error) {
           console.error('Error fetching bookings:', error);
@@ -443,10 +443,10 @@ const AdminDashboard = () => {
                       return (
                         <TableRow key={booking.id}>
                           <TableCell className="font-medium">{booking.id.slice(0, 8)}...</TableCell>
-                          <TableCell>{client?.full_name}</TableCell>
-                          <TableCell>{provider?.full_name}</TableCell>
-                          <TableCell>{format(new Date(booking.scheduled_date), 'PPP')}</TableCell>
-                          <TableCell>R{booking.price.toFixed(2)}</TableCell>
+                              <TableCell>{client?.full_name}</TableCell>
+                              <TableCell>{provider?.full_name}</TableCell>
+                              <TableCell>{format(new Date(booking.scheduled_at), 'PPP')}</TableCell>
+                                  <TableCell>R{booking.total_fee?.toFixed(2) || 'N/A'}</TableCell>
                           <TableCell>
                             <Badge variant={
                               booking.status === 'completed' ? 'default' :

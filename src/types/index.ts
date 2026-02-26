@@ -40,17 +40,15 @@ export interface Dog {
 // Booking type (from Supabase bookings table)
 export interface Booking {
   id: string;
-  client_id: string;
-  provider_id: string;
-  dog_ids: string[];
-  scheduled_date: string;
-  duration: number;
-  status: 'pending' | 'confirmed' | 'active' | 'completed' | 'cancelled';
-  price: number;
+  client_id?: string;
+  provider_id?: string;
+  dog_id?: string;
+  scheduled_at?: string;
+  status?: 'pending' | 'confirmed' | 'active' | 'completed' | 'cancelled';
+  total_fee?: number;
   platform_fee?: number;
   provider_payout?: number;
   created_at?: string;
-  updated_at?: string;
 }
 
 // Review type (from Supabase reviews table)
