@@ -37,7 +37,7 @@ const Landing = () => {
         </p>
 
         {/* Role Cards */}
-        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto mt-16">
+        <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto mt-16">
           <Link to="/register?role=client">
             <Card className="hover:shadow-xl transition-shadow cursor-pointer border-2 hover:border-green-300">
               <CardHeader>
@@ -92,36 +92,6 @@ const Landing = () => {
                   <li className="flex items-center gap-2">
                     <Shield className="w-4 h-4 text-green-500" />
                     Insured bookings
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link to="/login?role=admin">
-            <Card className="hover:shadow-xl transition-shadow cursor-pointer border-2 hover:border-blue-300">
-              <CardHeader>
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Shield className="w-8 h-8 text-blue-600" />
-                </div>
-                <CardTitle className="text-2xl">Admin Portal</CardTitle>
-                <CardDescription className="text-base">
-                  Manage users, track revenue, and approve providers
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-blue-500" />
-                    User management
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-blue-500" />
-                    Revenue tracking
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-blue-500" />
-                    Safety oversight
                   </li>
                 </ul>
               </CardContent>
