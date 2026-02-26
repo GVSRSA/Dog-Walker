@@ -30,6 +30,8 @@ const transformProfile = (dbProfile: any): Profile => {
     // Admins are auto-approved, others default to false
     is_approved: dbProfile.is_approved ?? dbProfile.role === 'admin',
     is_suspended: dbProfile.is_suspended ?? false,
+    avatar_url: dbProfile.avatar_url ?? null,
+    phone: dbProfile.phone ?? null,
     bio: dbProfile.bio || undefined,
     location: dbProfile.location || undefined,
     services: dbProfile.services || undefined,

@@ -8,6 +8,8 @@ export interface Profile {
   role: 'admin' | 'provider' | 'client';
   is_approved: boolean;
   is_suspended: boolean;
+  avatar_url?: string | null;
+  phone?: string | null;
   bio?: string;
   location?: {
     lat: number;

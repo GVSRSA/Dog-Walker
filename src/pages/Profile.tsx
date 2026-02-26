@@ -1,990 +1,305 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Switch } from '@/components/ui/switch';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import type { Profile, Dog } from '@/types';
-import { 
-  LogOut, User, MapPin, Phone, Calendar, 
-  Shield, Dog as DogIcon, Star, DollarSign, 
-  CheckCircle, XCircle, Plus, Trash2 
-} from 'lucide-react';
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Camera, LogOut, Shield, UserRound } from "lucide-react";
 
-const Profile = () => {
-  const { currentUser, logout } = useAuth();
+import RoleNavbar from "@/components/RoleNavbar";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+
+const AVATAR_BUCKET = "dog-photos";
+
+export default function Profile() {
+  const { currentUser, setCurrentUser, logout } = useAuth();
   const navigate = useNavigate();
-  const profile = currentUser as Profile;
+  const { toast } = useToast();
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | null>(null);
-  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
-  const [showAddDogModal, setShowAddDogModal] = useState(false);
-  const [dogs, setDogs] = useState<Dog[]>([]);
-  const [loadingDogs, setLoadingDogs] = useState(false);
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [loadingReviews, setLoadingReviews] = useState(false);
-  const [addDogStatus, setAddDogStatus] = useState<'success' | 'error' | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  
-  const [newDog, setNewDog] = useState({
-    name: '',
-    breed: '',
-    age: 0,
-    weight: 0,
-    special_instructions: '',
-    image_url: '',
-  });
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>('');
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState({
-    full_name: '',
-    email: '',
-    bio: '',
-    location: { lat: 0, lng: 0, address: '' } as any,
-    hourly_rate: 0,
-    services: [] as string[],
-  });
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
-  // Fetch dogs for current user
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
   useEffect(() => {
-    if (!profile?.id) return;
+    if (!currentUser) return;
+    setFullName(currentUser.full_name || "");
+    setPhone(currentUser.phone || "");
+    setAvatarUrl(currentUser.avatar_url || null);
+    setAvatarFile(null);
+    setAvatarPreview(null);
+  }, [currentUser]);
 
-    const fetchUserDogs = async () => {
-      setLoadingDogs(true);
-      try {
-        const { data, error } = await supabase
-          .from('dogs')
-          .select('*')
-          .eq('owner_id', profile.id)
-          .order('created_at', { ascending: false });
+  const roleLabel = useMemo(() => {
+    switch (currentUser?.role) {
+      case "admin":
+        return "Admin";
+      case "provider":
+        return "Provider";
+      case "client":
+        return "Client";
+      default:
+        return "";
+    }
+  }, [currentUser?.role]);
 
-        if (error) {
-          console.error('Error fetching dogs:', error);
-        } else {
-          setDogs(data || []);
-        }
-      } catch (err) {
-        console.error('Error:', err);
-      } finally {
-        setLoadingDogs(false);
-      }
-    };
-
-    fetchUserDogs();
-  }, [profile?.id]);
-
-  // Fetch reviews for current user (only for providers)
-  useEffect(() => {
-    if (!profile?.id || profile.role !== 'provider') return;
-
-    const fetchUserReviews = async () => {
-      setLoadingReviews(true);
-      try {
-        const { data, error } = await supabase
-          .from('reviews')
-          .select('*')
-          .eq('provider_id', profile.id)
-          .order('created_at', { ascending: false });
-
-        if (error) {
-          console.error('Error fetching reviews:', error);
-        } else {
-          setReviews(data || []);
-        }
-      } catch (err) {
-        console.error('Error:', err);
-      } finally {
-        setLoadingReviews(false);
-      }
-    };
-
-    fetchUserReviews();
-  }, [profile?.id, profile?.role]);
-
-  // Sync form data with current user
-  useEffect(() => {
-    if (profile) {
-      setFormData({
-        full_name: profile.full_name || '',
-        email: profile.email || '',
-        bio: profile.bio || '',
-        location: profile.location || { lat: 0, lng: 0, address: '' },
-        hourly_rate: profile.hourly_rate || 0,
-        services: profile.services || [],
+  const handleAvatarPick = (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Invalid file",
+        description: "Please choose a PNG/JPG image.",
+        variant: "destructive",
       });
-    }
-  }, [profile]);
-
-  const handleLogout = async () => {
-    await logout();
-    navigate('/');
-  };
-
-  const handleAddDog = async () => {
-    if (!newDog.name || !newDog.breed) {
-      alert('Please fill in the required fields (Name and Breed)');
       return;
     }
 
-    setAddDogStatus(null);
-    setUploadingImage(true);
-
-    let imageUrl = '';
-
-    // Upload image if one is selected
-    if (imageFile) {
-      try {
-        console.log('[handleAddDog] Uploading image to Supabase Storage...');
-        
-        const fileExt = imageFile.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        const filePath = `${profile!.id}/${fileName}`;
-
-        const { error: uploadError, data: uploadData } = await supabase.storage
-          .from('dog-photos')
-          .upload(filePath, imageFile);
-
-        if (uploadError) {
-          console.error('[handleAddDog] Image upload failed:', uploadError);
-          setAddDogStatus('error');
-          alert('Failed to upload image. Please try again.');
-          setUploadingImage(false);
-          return;
-        }
-
-        console.log('[handleAddDog] Image uploaded successfully:', uploadData);
-
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('dog-photos')
-          .getPublicUrl(filePath);
-
-        imageUrl = publicUrl;
-        console.log('[handleAddDog] Image public URL:', imageUrl);
-      } catch (err) {
-        console.error('[handleAddDog] Error uploading image:', err);
-        setAddDogStatus('error');
-        alert('Failed to upload image. Please try again.');
-        setUploadingImage(false);
-        return;
-      }
-    }
-
-    // Prepare to dog object with proper type conversions
-    const dogData = {
-      owner_id: (await supabase.auth.getUser()).data.user?.id,
-      name: newDog.name,
-      breed: newDog.breed,
-      age: Number(newDog.age) || 0,
-      weight: String(Number(newDog.weight) || 0), // Convert to string for DB TEXT column
-      special_instructions: newDog.special_instructions || '',
-      image_url: imageUrl || null,
-    };
-
-    if (!dogData.owner_id) {
-      setAddDogStatus('error');
-      setUploadingImage(false);
-      alert('You must be logged in to add a dog.');
-      return;
-    }
-
-    console.log('[handleAddDog] Attempting to add dog with data:', dogData);
-    console.log('[handleAddDog] Age type:', typeof dogData.age, 'Value:', dogData.age);
-    console.log('[handleAddDog] Weight type:', typeof dogData.weight, 'Value:', dogData.weight);
-    console.log('[handleAddDog] Image URL:', dogData.image_url);
-
-    try {
-      const { error, data } = await supabase
-        .from('dogs')
-        .insert(dogData)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('[handleAddDog] Error adding dog:', error);
-        console.error('[handleAddDog] Error details:', {
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint,
-        });
-        setAddDogStatus('error');
-        alert(`Failed to add dog: ${error.message}`);
-        setUploadingImage(false);
-        return;
-      }
-
-      console.log('[handleAddDog] Dog added successfully:', data);
-      
-      setNewDog({ name: '', breed: '', age: 0, weight: 0, special_instructions: '', image_url: '' });
-      setImageFile(null);
-      setImagePreview('');
-      setShowAddDogModal(false);
-      setAddDogStatus('success');
-      setUploadingImage(false);
-      
-      // Refresh dogs
-      const { data: dogsData } = await supabase
-        .from('dogs')
-        .select('*')
-        .eq('owner_id', dogData.owner_id)
-        .order('created_at', { ascending: false });
-      setDogs(dogsData || []);
-      
-      alert('🐕 Dog added successfully!');
-    } catch (err) {
-      console.error('[handleAddDog] Unexpected error:', err);
-      setAddDogStatus('error');
-      setUploadingImage(false);
-      alert('Failed to add dog. Please try again.');
-    }
-  };
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file (JPG, PNG, etc.)');
-      return;
-    }
-
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('Image must be less than 5MB');
+      toast({
+        title: "Image too large",
+        description: "Please choose an image under 5MB.",
+        variant: "destructive",
+      });
       return;
     }
 
-    setImageFile(file);
-
-    // Create preview
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    setAvatarFile(file);
+    const url = URL.createObjectURL(file);
+    setAvatarPreview(url);
   };
 
-  const handleRemoveImage = () => {
-    setImageFile(null);
-    setImagePreview('');
-  };
+  const uploadAvatarIfNeeded = async () => {
+    if (!avatarFile || !currentUser) return avatarUrl;
 
-  const handleRemoveDog = async (dogId: string) => {
-    if (window.confirm('Are you sure you want to remove this dog?')) {
-      try {
-        const { error } = await supabase
-          .from('dogs')
-          .delete()
-          .eq('id', dogId);
-
-        if (error) {
-          console.error('Error removing dog:', error);
-          alert('Failed to remove dog');
-        } else {
-          setDogs(dogs.filter(d => d.id !== dogId));
-        }
-      } catch (err) {
-        console.error('Error:', err);
-        alert('Failed to remove dog');
-      }
-    }
-  };
-
-  const handleSave = async () => {
-    setSaveStatus('saving');
+    setUploading(true);
     try {
+      const ext = avatarFile.name.split(".").pop()?.toLowerCase() || "png";
+      const path = `${currentUser.id}/avatar-${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(AVATAR_BUCKET)
+        .upload(path, avatarFile, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
+      return data.publicUrl;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const onSave = async () => {
+    if (!currentUser) return;
+
+    setSaving(true);
+    try {
+      const nextAvatarUrl = await uploadAvatarIfNeeded();
+
       const { error } = await supabase
-        .from('profiles')
+        .from("profiles")
         .update({
-          full_name: formData.full_name,
-          bio: formData.bio,
-          location: formData.location,
-          hourly_rate: formData.hourly_rate,
-          services: formData.services,
+          full_name: fullName,
+          phone: phone || null,
+          avatar_url: nextAvatarUrl,
         })
-        .eq('id', profile!.id);
+        .eq("id", currentUser.id);
 
-      if (error) {
-        console.error('Error updating profile:', error);
-        setSaveStatus('error');
-      } else {
-        setSaveStatus('saved');
-        setTimeout(() => setSaveStatus(null), 2000);
-      }
-    } catch (error) {
-      console.error('Failed to save profile:', error);
-      setSaveStatus('error');
-      setTimeout(() => setSaveStatus(null), 2000);
+      if (error) throw error;
+
+      setAvatarUrl(nextAvatarUrl || null);
+      setAvatarFile(null);
+      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+      setAvatarPreview(null);
+
+      setCurrentUser({
+        ...currentUser,
+        full_name: fullName,
+        phone: phone || null,
+        avatar_url: nextAvatarUrl || null,
+      });
+
+      toast({
+        title: "Saved",
+        description: "Your profile has been updated.",
+      });
+    } catch (e: any) {
+      toast({
+        title: "Could not save",
+        description: e?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
-  const calculateAverageRating = () => {
-    if (reviews.length === 0) return 0;
-    const sum = reviews.reduce((acc, r) => acc + r.rating, 0);
-    return sum / reviews.length;
+  const onLogout = async () => {
+    await logout();
+    navigate("/");
   };
 
-  const renderClientProfile = () => (
-    <>
-      <div className="space-y-6">
-        <div>
-          <Label htmlFor="client-name">Full Name</Label>
-          {isEditing ? (
-            <Input
-              id="client-name"
-              value={formData.full_name}
-              onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-            />
-          ) : (
-            <p className="text-sm text-gray-600 mt-1">{profile?.full_name}</p>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="client-email">Email</Label>
-          {isEditing ? (
-            <Input
-              id="client-email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            />
-          ) : (
-            <p className="text-sm text-gray-600 mt-1">{profile?.email}</p>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="client-location">Location</Label>
-          {isEditing ? (
-            <Input
-              id="client-location"
-              placeholder="Enter your address"
-              value={formData.location?.address || ''}
-              onChange={(e) => setFormData({ ...formData, location: { ...formData.location, address: e.target.value } })}
-            />
-          ) : (
-            <p className="text-sm text-gray-600 mt-1">{formData.location?.address || 'Not provided'}</p>
-          )}
-        </div>
-
-        <div className="pt-4 border-t">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-semibold">My Dogs</h3>
-            <Button
-              size="sm"
-              onClick={() => setShowAddDogModal(true)}
-              className="bg-green-700 hover:bg-green-800"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Dog
-            </Button>
-          </div>
-          {dogs.length > 0 ? (
-            <div className="space-y-3">
-              {dogs.map((dog) => (
-                <div key={dog.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                  <div className="flex items-center gap-4">
-                    {dog.image_url ? (
-                      <img
-                        src={dog.image_url}
-                        alt={dog.name}
-                        className="w-12 h-12 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                        <DogIcon className="w-6 h-6 text-blue-600" />
-                      </div>
-                    )}
-                    <div>
-                      <p className="font-semibold text-gray-900">{dog.name}</p>
-                      <p className="text-sm text-gray-600">{dog.breed} {dog.age > 0 && `• ${dog.age} years old`}</p>
-                      {dog.special_instructions && (
-                        <p className="text-xs text-gray-500 mt-1 max-w-md truncate">{dog.special_instructions}</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant="secondary">Active</Badge>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => handleRemoveDog(dog.id)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <DogIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-600 mb-2">No dogs registered yet</p>
-              <Button
-                size="sm"
-                onClick={() => setShowAddDogModal(true)}
-                variant="outline"
-                className="text-green-700 border-green-300 hover:bg-green-50"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Your First Dog
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-    </>
-  );
-
-  const renderProviderProfile = () => (
-    <>
-      <div className="space-y-6">
-        <div>
-          <Label htmlFor="provider-name">Full Name</Label>
-          {isEditing ? (
-            <Input
-              id="provider-name"
-              value={formData.full_name}
-              onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-            />
-          ) : (
-            <p className="text-sm text-gray-600 mt-1">{profile?.full_name}</p>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="provider-email">Email</Label>
-          {isEditing ? (
-            <Input
-              id="provider-email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            />
-          ) : (
-            <p className="text-sm text-gray-600 mt-1">{profile?.email}</p>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="provider-bio">Bio</Label>
-          {isEditing ? (
-            <Input
-              id="provider-bio"
-              value={formData.bio}
-              onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-            />
-          ) : (
-            <p className="text-sm text-gray-600 mt-1">{formData.bio || 'No bio provided'}</p>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="provider-location">Location</Label>
-          {isEditing ? (
-            <Input
-              id="provider-location"
-              placeholder="Enter your service area"
-              value={formData.location?.address || ''}
-              onChange={(e) => setFormData({ ...formData, location: { ...formData.location, address: e.target.value } })}
-            />
-          ) : (
-            <p className="text-sm text-gray-600 mt-1">{formData.location?.address || 'Not provided'}</p>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="provider-hourly-rate">Hourly Rate (R)</Label>
-          {isEditing ? (
-            <Input
-              id="provider-hourly-rate"
-              type="number"
-              value={formData.hourly_rate}
-              onChange={(e) => setFormData({ ...formData, hourly_rate: parseFloat(e.target.value) })}
-            />
-          ) : (
-            <p className="text-sm text-gray-600 mt-1">R{formData.hourly_rate}/hour</p>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="provider-services">Services</Label>
-          {isEditing ? (
-            <Input
-              id="provider-services"
-              placeholder="Comma-separated services (e.g., Walking, Pet Sitting)"
-              value={formData.services.join(', ')}
-              onChange={(e) => setFormData({ ...formData, services: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
-            />
-          ) : (
-            <div className="flex flex-wrap gap-2 mt-2">
-              {formData.services.map((service, idx) => (
-                <Badge key={idx} variant="secondary">{service}</Badge>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </>
-  );
-
-  const renderAdminProfile = () => (
-    <>
-      <div className="space-y-6">
-        <div>
-          <Label htmlFor="admin-name">Full Name</Label>
-          {isEditing ? (
-            <Input
-              id="admin-name"
-              value={formData.full_name}
-              onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-            />
-          ) : (
-            <p className="text-sm text-gray-600 mt-1">{profile?.full_name}</p>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="admin-email">Email</Label>
-          {isEditing ? (
-            <Input
-              id="admin-email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            />
-          ) : (
-            <p className="text-sm text-gray-600 mt-1">{profile?.email}</p>
-          )}
-        </div>
-
-        <div className="pt-4 border-t">
-          <p className="text-sm text-gray-500">
-            As an administrator, you have full access to manage users, bookings, and platform settings.
-          </p>
-        </div>
-      </div>
-    </>
-  );
-
-  const getDashboardRoute = () => {
-    switch (profile?.role) {
-      case 'admin': return '/admin';
-      case 'provider': return '/provider';
-      case 'client': return '/client';
-      default: return '/';
-    }
-  };
-
-  const averageRating = calculateAverageRating();
+  const displayAvatar = avatarPreview || avatarUrl;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-              <User className="w-5 h-5 text-green-700" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">Profile</h1>
-              <p className="text-sm text-green-700 font-medium">by Jolly Walker</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link to={getDashboardRoute()}>
-              <Button variant="ghost">Back to Dashboard</Button>
-            </Link>
-            <Button variant="ghost" onClick={() => setShowLogoutDialog(true)}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-[hsl(var(--background))]">
+      <RoleNavbar activeKey="profile" />
 
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Save Status Alert */}
-        {saveStatus === 'saved' && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <p className="text-green-800 font-medium">Profile updated successfully!</p>
-          </div>
-        )}
-        {saveStatus === 'error' && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
-            <XCircle className="w-5 h-5 text-red-600" />
-            <p className="text-red-800 font-medium">Failed to update profile. Please try again.</p>
-          </div>
-        )}
-        
-        {/* Add Dog Success Alert */}
-        {addDogStatus === 'success' && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <p className="text-green-800 font-medium">🐕 Dog added successfully!</p>
-          </div>
-        )}
-        {addDogStatus === 'error' && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
-            <XCircle className="w-5 h-5 text-red-600" />
-            <p className="text-red-800 font-medium">Failed to add dog. Please try again.</p>
-          </div>
-        )}
-
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Left Sidebar - Summary */}
-          <div className="lg:col-span-1">
-            <Card>
-              <CardHeader>
-                <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <User className="w-10 h-10 text-white" />
-                </div>
-                <CardTitle className="text-center">{profile?.full_name}</CardTitle>
-                <div className="text-center">
-                  <Badge variant={
-                    profile?.role === 'admin' ? 'default' :
-                    profile?.role === 'provider' ? 'secondary' : 'outline'
-                  }>
-                    {profile?.role?.toUpperCase()}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-3 text-sm">
-                  <Calendar className="w-4 h-4 text-gray-500" />
-                  <span className="text-gray-600">
-                    Member since {profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : 'N/A'}
-                  </span>
-                </div>
-                {profile?.location?.address && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <MapPin className="w-4 h-4 text-gray-500" />
-                    <span className="text-gray-600">{profile.location.address}</span>
-                  </div>
-                )}
-                {profile?.role === 'provider' && (
-                  <>
-                    <div className="flex items-center gap-3 text-sm pt-4 border-t">
-                      <Star className="w-4 h-4 text-amber-500" />
-                      <span className="text-gray-600 font-medium">{profile.avg_rating?.toFixed(1)} Rating</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm">
-                      <DogIcon className="w-4 h-4 text-blue-500" />
-                      <span className="text-gray-600">{profile.review_count} Reviews</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm">
-                      <DollarSign className="w-4 h-4 text-green-500" />
-                      <span className="text-gray-600">R{profile.hourly_rate}/hour</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm">
-                      <Shield className="w-4 h-4 text-purple-500" />
-                      <span className="text-gray-600">{profile.credit_balance} Credits Available</span>
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right Content - Profile Form */}
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Profile Information</CardTitle>
-                    <CardDescription>
-                      {isEditing ? 'Edit your profile details' : 'View and manage your profile'}
-                    </CardDescription>
-                  </div>
-                  <Button
-                    variant={isEditing ? "default" : "outline"}
-                    onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-                    disabled={saveStatus === 'saving'}
-                    className={isEditing ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
-                  >
-                    {saveStatus === 'saving' ? 'Saving...' : isEditing ? 'Save Changes' : 'Edit Profile'}
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {profile?.role === 'client' && renderClientProfile()}
-                {profile?.role === 'provider' && renderProviderProfile()}
-                {profile?.role === 'admin' && renderAdminProfile()}
-              </CardContent>
-            </Card>
-
-            {/* Account Status Card */}
-            {profile?.role !== 'admin' && (
-              <Card className="mt-6">
-                <CardHeader>
-                  <CardTitle>Account Status</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Shield className="w-5 h-5 text-green-600" />
-                      <div>
-                        <p className="font-medium">Account Status</p>
-                        <p className="text-sm text-gray-600">
-                          {profile?.is_approved ? (
-                            <span className="text-green-600">Active and Approved</span>
-                          ) : (
-                            <span className="text-amber-600">Pending Approval</span>
-                          )}
-                        </p>
+      <main className="container mx-auto max-w-4xl px-4 py-6 sm:py-10">
+        <div className="grid gap-6 md:grid-cols-[320px_1fr]">
+          <Card className="rounded-3xl border-slate-200/70 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg font-extrabold tracking-tight text-slate-900">Your account</CardTitle>
+              <CardDescription className="text-slate-600">Keep your details up to date.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <div className="h-16 w-16 overflow-hidden rounded-2xl bg-green-100 ring-1 ring-green-200">
+                    {displayAvatar ? (
+                      <img src={displayAvatar} alt="Profile" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="grid h-full w-full place-items-center">
+                        <UserRound className="h-7 w-7 text-green-700" />
                       </div>
-                    </div>
-                    {profile?.is_suspended && (
-                      <Badge variant="destructive">Suspended</Badge>
                     )}
                   </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </div>
-
-        {/* Reviews Card */}
-        {profile?.role === 'provider' && (
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Reviews</CardTitle>
-              <CardDescription>What others say about you</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loadingReviews ? (
-                <div className="text-center py-8 text-gray-500">Loading reviews...</div>
-              ) : reviews.length === 0 ? (
-                <div className="text-center py-12 bg-gray-50 rounded-lg">
-                  <Star className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-600">No reviews yet</p>
-                  <p className="text-sm text-gray-500 mt-1">Complete bookings to receive reviews from others</p>
+                  <Label
+                    htmlFor="avatar"
+                    className="absolute -bottom-2 -right-2 grid h-9 w-9 cursor-pointer place-items-center rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm hover:bg-green-50"
+                    title="Change photo"
+                  >
+                    <Camera className="h-4 w-4 text-slate-700" />
+                  </Label>
                 </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* Rating Summary */}
-                  <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          className={`w-6 h-6 ${
-                            star <= Math.round(averageRating)
-                              ? 'fill-amber-500 text-amber-500'
-                              : 'text-gray-300'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-gray-900">{averageRating.toFixed(1)}</p>
-                      <p className="text-sm text-gray-600">{reviews.length} review{reviews.length !== 1 ? 's' : ''}</p>
-                    </div>
-                  </div>
 
-                  {/* Reviews List */}
-                  <div className="space-y-4">
-                    {reviews.map((review) => (
-                      <div key={review.id} className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center">
-                              <User className="w-5 h-5 text-white" />
-                            </div>
-                            <div>
-                              <p className="font-semibold text-gray-900">Client</p>
-                              <p className="text-xs text-gray-500">
-                                {review.created_at ? new Date(review.created_at).toLocaleDateString() : 'N/A'}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Star
-                                key={star}
-                                className={`w-4 h-4 ${
-                                  star <= review.rating
-                                    ? 'fill-amber-500 text-amber-500'
-                                    : 'text-gray-300'
-                                }`}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                        {review.comment && (
-                          <p className="text-gray-700 text-sm leading-relaxed">{review.comment}</p>
-                        )}
-                      </div>
-                    ))}
+                <div className="min-w-0">
+                  <div className="truncate text-base font-extrabold tracking-tight text-slate-900">
+                    {currentUser?.full_name || "—"}
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* Add Dog Modal */}
-      {showAddDogModal && (
-        <Dialog open={showAddDogModal} onOpenChange={setShowAddDogModal}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Add New Dog</DialogTitle>
-              <DialogDescription>Register your furry friend in the system</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="dog-name">Name *</Label>
-                <Input
-                  id="dog-name"
-                  placeholder="Dog's name"
-                  value={newDog.name}
-                  onChange={(e) => setNewDog({ ...newDog, name: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="dog-breed">Breed *</Label>
-                <Input
-                  id="dog-breed"
-                  placeholder="e.g., Golden Retriever, Labrador"
-                  value={newDog.breed}
-                  onChange={(e) => setNewDog({ ...newDog, breed: e.target.value })}
-                />
-              </div>
-
-              {/* Image Upload */}
-              <div>
-                <Label htmlFor="dog-image">Photo</Label>
-                {imagePreview ? (
-                  <div className="mt-2">
-                    <div className="relative inline-block">
-                      <img
-                        src={imagePreview}
-                        alt="Dog preview"
-                        className="w-32 h-32 object-cover rounded-lg border-2 border-green-200"
-                      />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        onClick={handleRemoveImage}
-                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
-                      >
-                        ×
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-2">
-                    <Input
-                      id="dog-image"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                      className="cursor-pointer"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">JPG, PNG up to 5MB</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="dog-age">Age (years)</Label>
-                  <Input
-                    id="dog-age"
-                    type="number"
-                    min="0"
-                    step="1"
-                    placeholder="Age"
-                    value={newDog.age || ''}
-                    onChange={(e) => setNewDog({ ...newDog, age: parseInt(e.target.value, 10) || 0 })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="dog-weight">Weight (kg)</Label>
-                  <Input
-                    id="dog-weight"
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    placeholder="Weight"
-                    value={newDog.weight || ''}
-                    onChange={(e) => setNewDog({ ...newDog, weight: parseFloat(e.target.value) || 0 })}
-                  />
+                  <div className="truncate text-sm font-semibold text-green-700">{currentUser?.email}</div>
                 </div>
               </div>
-              <div>
-                <Label htmlFor="dog-notes">Special Instructions / Notes</Label>
-                <Input
-                  id="dog-notes"
-                  placeholder="e.g., Needs longer walks, food allergies, etc."
-                  value={newDog.special_instructions}
-                  onChange={(e) => setNewDog({ ...newDog, special_instructions: e.target.value })}
-                />
-              </div>
-              <div className="flex gap-4 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowAddDogModal(false);
-                    setNewDog({ name: '', breed: '', age: 0, weight: 0, special_instructions: '', image_url: '' });
-                    setImageFile(null);
-                    setImagePreview('');
-                  }}
-                  disabled={uploadingImage}
-                  className="flex-1 text-green-700 border-green-300 hover:bg-green-50"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleAddDog}
-                  disabled={!newDog.name || !newDog.breed || uploadingImage}
-                  className="flex-1 bg-green-700 hover:bg-green-800"
-                >
-                  {uploadingImage ? 'Adding...' : 'Add Dog'}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
 
-      {/* Logout Confirmation Dialog */}
-      {showLogoutDialog && (
-        <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Confirm Logout</DialogTitle>
-              <DialogDescription>Are you sure you want to logout? You'll need to login again to access your account.</DialogDescription>
-            </DialogHeader>
-            <div className="flex gap-4 pt-4">
-              <Button variant="outline" onClick={() => setShowLogoutDialog(false)} className="flex-1">
-                Cancel
-              </Button>
-              <Button onClick={handleLogout} className="flex-1 bg-green-700 hover:bg-green-800">
+              <input
+                id="avatar"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleAvatarPick(f);
+                }}
+              />
+
+              <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-slate-700" />
+                  <div className="text-sm font-bold text-slate-900">Role</div>
+                </div>
+                <div className="mt-1 text-sm text-slate-600">
+                  {roleLabel}
+                  {currentUser?.role !== "admin" ? (
+                    <span className="ml-1">(read-only)</span>
+                  ) : (
+                    <span className="ml-1">(managed in Admin Dashboard)</span>
+                  )}
+                </div>
+              </div>
+
+              <Separator />
+
+              <Button
+                onClick={onLogout}
+                className="w-full rounded-2xl bg-rose-600 text-white hover:bg-rose-700"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
                 Logout
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+              <p className="text-xs text-slate-500">
+                Use this logout button anytime—it's always available here as a backup.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-3xl border-slate-200/70 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg font-extrabold tracking-tight text-slate-900">Profile settings</CardTitle>
+              <CardDescription className="text-slate-600">
+                Update your name, phone number, and profile picture.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="rounded-2xl"
+                    placeholder="Your full name"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone number</Label>
+                  <Input
+                    id="phone"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="rounded-2xl"
+                    placeholder="e.g. +1 555 123 4567"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <Input value={roleLabel} disabled className="rounded-2xl" />
+                <p className="text-xs text-slate-500">
+                  {currentUser?.role === "admin"
+                    ? "Role changes are done from the Admin Dashboard."
+                    : "Your role is locked. Only an Admin can change it."}
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <Button
+                  onClick={onSave}
+                  disabled={saving || uploading}
+                  className="rounded-2xl bg-green-700 text-white hover:bg-green-800"
+                >
+                  {saving ? "Saving…" : uploading ? "Uploading…" : "Save changes"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-2xl border-slate-200 text-slate-700 hover:bg-slate-50"
+                  onClick={() => {
+                    if (!currentUser) return;
+                    setFullName(currentUser.full_name || "");
+                    setPhone(currentUser.phone || "");
+                    setAvatarFile(null);
+                    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+                    setAvatarPreview(null);
+                    setAvatarUrl(currentUser.avatar_url || null);
+                  }}
+                >
+                  Discard
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
     </div>
   );
-};
-
-export default Profile;
+}

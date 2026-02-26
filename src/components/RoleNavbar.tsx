@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Dog, LogOut, CalendarDays, Users, Bone, PawPrint, HandCoins, Clock3, ClipboardList, Search } from 'lucide-react';
+import { Dog, LogOut, CalendarDays, Users, Bone, PawPrint, HandCoins, Clock3, ClipboardList, Search, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -55,6 +55,9 @@ export default function RoleNavbar({ activeKey }: RoleNavbarProps) {
       { key: 'earnings', label: 'Earnings', to: '/provider#earnings', icon: HandCoins },
     ];
   }
+
+  // Always show Profile/Settings for every role (including admin, client, provider)
+  items = [...items, { key: 'profile', label: 'Profile', to: '/profile', icon: UserRound }];
 
   const onLogout = async () => {
     await logout();
