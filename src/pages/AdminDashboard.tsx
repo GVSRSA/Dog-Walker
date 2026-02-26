@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Profile, Booking, Review } from '@/types';
 import { 
   DollarSign, Users, ShoppingCart, TrendingUp, 
-  CheckCircle, XCircle, LogOut, Shield, User, Star, Dog
+  CheckCircle, XCircle, LogOut, Shield, Star, Dog
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -22,7 +22,7 @@ const AdminDashboard = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'bookings' | 'safety'>('users');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'bookings' | 'safety' | 'settings'>('users');
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   const fetchUsers = async () => {
@@ -164,6 +164,30 @@ useEffect(() => {
     }
   };
 
+  const downloadUsersCsv = () => {
+    const headers = ['full_name', 'email', 'role', 'is_approved', 'is_suspended', 'created_at'];
+    const rows = profiles.map((p) => [
+      p.full_name ?? '',
+      p.email ?? '',
+      p.role ?? '',
+      String(!!p.is_approved),
+      String(!!p.is_suspended),
+      p.created_at ?? '',
+    ]);
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `users_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Calculate average rating for a user
   const getAverageRating = (userId: string): number => {
     const userReviews = reviews.filter(r => r.provider_id === userId);
@@ -190,7 +214,7 @@ useEffect(() => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+        <div className="container mx-auto px-4 py-4 flex flex-col gap-3 md:flex-row md:justify-between md:items-center">
           <div className="flex items-center gap-3">
             <Shield className="w-8 h-8 text-green-700" />
             <div>
@@ -199,12 +223,23 @@ useEffect(() => {
               <p className="text-xs text-gray-600">Welcome, {currentUser?.full_name}</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Link to="/profile">
-              <Button variant="ghost" size="icon">
-                <User className="w-4 h-4" />
-              </Button>
-            </Link>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={activeTab === 'users' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('users')}
+              className={activeTab === 'users' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
+            >
+              Users
+            </Button>
+            <Button
+              variant={activeTab === 'settings' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('settings')}
+              className={activeTab === 'settings' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
+            >
+              Settings
+            </Button>
             <Button variant="ghost" onClick={handleLogout}>
               <LogOut className="w-4 h-4 mr-2" />
               Logout
@@ -215,7 +250,7 @@ useEffect(() => {
 
       <div className="container mx-auto px-4 py-8">
         {/* Tabs */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex flex-wrap gap-2 mb-6">
           <Button
             variant={activeTab === 'overview' ? 'default' : 'outline'}
             onClick={() => setActiveTab('overview')}
@@ -394,7 +429,12 @@ useEffect(() => {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            <Badge variant={profile.is_approved ? 'default' : 'outline'}>
+                            <Badge
+                              className={profile.is_approved
+                                ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                : 'bg-amber-100 text-amber-900 border border-amber-200 hover:bg-amber-100'
+                              }
+                            >
                               {profile.is_approved ? 'Approved' : 'Pending'}
                             </Badge>
                             {profile.is_suspended && (
@@ -404,7 +444,7 @@ useEffect(() => {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-2">
-                            {profile.role === 'provider' && !profile.is_approved && (
+                            {!profile.is_approved && profile.role !== 'admin' && (
                               <Button
                                 size="sm"
                                 onClick={() => handleApprove(profile.id)}
@@ -441,6 +481,60 @@ useEffect(() => {
               )}
             </CardContent>
           </Card>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Data Tools</CardTitle>
+                <CardDescription>Quick actions for managing your platform</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3">
+                <Button
+                  variant="outline"
+                  onClick={fetchUsers}
+                  className="justify-start"
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Refresh user list
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={downloadUsersCsv}
+                  className="justify-start"
+                >
+                  <ShoppingCart className="w-4 h-4 mr-2" />
+                  Download users CSV
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Platform Snapshot</CardTitle>
+                <CardDescription>Live counts based on current data</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Total users</span>
+                  <span className="font-semibold text-gray-900">{profiles.length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Pending providers</span>
+                  <span className="font-semibold text-amber-700">{pendingProviders.length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Active bookings</span>
+                  <span className="font-semibold text-gray-900">{activeBookings.length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Completed bookings</span>
+                  <span className="font-semibold text-gray-900">{completedBookings.length}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {activeTab === 'bookings' && (

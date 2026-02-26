@@ -339,9 +339,6 @@ const ClientDashboard = () => {
                 Admin Dashboard
               </Link>
             )}
-            <Link to="/provider" className="text-sm text-green-700 hover:underline">
-              Provider Dashboard
-            </Link>
             <Link to="/profile">
               <Button variant="ghost" size="icon">
                 <User className="w-4 h-4" />
