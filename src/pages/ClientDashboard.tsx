@@ -257,6 +257,13 @@ const ClientDashboard = () => {
       return;
     }
 
+    // Prevent orphan bookings + ensure the dog belongs to the current client
+    const dog = myDogs.find((d) => d.id === selectedDog);
+    if (!dog) {
+      setBookingError("Please select a dog from your list (add a dog first if you don't have one).");
+      return;
+    }
+
     setBookingError('');
 
     try {
@@ -278,28 +285,26 @@ const ClientDashboard = () => {
         return;
       }
 
-      const price = (parseFloat(selectedDuration) * (selectedProvider.hourly_rate || 0)) / 60;
-      const platformFee = price * 0.15;
-      const providerPayout = price - platformFee;
+      const totalFee = (parseFloat(selectedDuration) * (selectedProvider.hourly_rate || 0)) / 60;
+      const platformFee = totalFee * 0.15;
+      const providerPayout = totalFee - platformFee;
       const scheduledDateTime = `${selectedDate}T${selectedTime}`;
 
       const { error } = await supabase.from('bookings').insert({
         client_id: currentUser.id,
         provider_id: selectedProvider.id,
-        dog_ids: [selectedDog],
+        dog_id: selectedDog,
         scheduled_at: scheduledDateTime,
         scheduled_date: selectedDate,
-        duration: parseInt(selectedDuration),
         status: 'pending',
-        price: price,
+        total_fee: totalFee,
         platform_fee: platformFee,
         provider_payout: providerPayout,
-        created_at: new Date().toISOString(),
       });
 
       if (error) {
         console.error('Error creating booking:', error);
-        setBookingError('Failed to create booking');
+        setBookingError(error.message || 'Failed to create booking');
       } else {
         setShowBookingModal(false);
         setSelectedDog('');
@@ -655,81 +660,129 @@ const ClientDashboard = () => {
                           <CardContent>
                             <Dialog>
                               <DialogTrigger asChild>
-                                <Button className="w-full bg-green-700 hover:bg-green-800" onClick={() => setSelectedProvider(provider)}>
-                                  Book Now
-                                </Button>
+                                <div className="space-y-2">
+                                  <Button
+                                    className="w-full bg-green-700 hover:bg-green-800"
+                                    onClick={() => {
+                                      setSelectedProvider(provider);
+                                      setSelectedDog('');
+                                      setSelectedDate('');
+                                      setSelectedTime('');
+                                      setSelectedDuration('60');
+                                      setBookingError('');
+                                    }}
+                                    disabled={loadingDogs || myDogs.length === 0}
+                                  >
+                                    Book Now
+                                  </Button>
+                                  {myDogs.length === 0 && !loadingDogs && (
+                                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+                                      Add a Dog first to book a walk.
+                                      <Button
+                                        type="button"
+                                        variant="link"
+                                        className="h-auto px-1 py-0 text-xs font-semibold text-amber-900 underline"
+                                        onClick={() => navigate('/my-dogs')}
+                                      >
+                                        Add a Dog
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
                               </DialogTrigger>
                               <DialogContent>
                                 <DialogHeader>
                                   <DialogTitle>Book {provider.full_name}</DialogTitle>
                                   <DialogDescription>Schedule a dog walk</DialogDescription>
                                 </DialogHeader>
-                                <div className="space-y-4">
-                                  <div>
-                                    <Label htmlFor="select-dog">Select Dog</Label>
-                                    <Select value={selectedDog} onValueChange={setSelectedDog}>
-                                      <SelectTrigger id="select-dog">
-                                        <SelectValue placeholder="Choose a dog" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {myDogs.map((dog) => (
-                                          <SelectItem key={dog.id} value={dog.id}>
-                                            {dog.name} ({dog.breed})
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div>
-                                    <Label htmlFor="booking-date">Date</Label>
-                                    <Input
-                                      id="booking-date"
-                                      type="date"
-                                      value={selectedDate}
-                                      onChange={(e) => setSelectedDate(e.target.value)}
-                                      min={new Date().toISOString().split('T')[0]}
-                                    />
-                                  </div>
-                                  <div>
-                                    <Label htmlFor="booking-time">Time</Label>
-                                    <Input id="booking-time" type="time" value={selectedTime} onChange={(e) => setSelectedTime(e.target.value)} />
-                                  </div>
-                                  <div>
-                                    <Label htmlFor="booking-duration">Duration</Label>
-                                    <Select value={selectedDuration} onValueChange={setSelectedDuration}>
-                                      <SelectTrigger id="booking-duration">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="30">30 minutes</SelectItem>
-                                        <SelectItem value="60">1 hour</SelectItem>
-                                        <SelectItem value="90">1.5 hours</SelectItem>
-                                        <SelectItem value="120">2 hours</SelectItem>
-                                        <SelectItem value="180">3 hours</SelectItem>
-                                        <SelectItem value="240">4 hours</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  {bookingError && <div className="text-red-600 text-sm">{bookingError}</div>}
-                                  {selectedDate && selectedTime && selectedDuration && (
-                                    <div className="p-4 bg-green-50 rounded-lg">
-                                      <p className="text-sm text-gray-600">Estimated Cost:</p>
-                                      <p className="text-2xl font-bold text-green-900">
-                                        R{((provider.hourly_rate || 0) * parseInt(selectedDuration) / 60).toFixed(2)}
-                                      </p>
-                                      <p className="text-xs text-gray-600">
-                                        {format(new Date(selectedDate), 'PPP')} at {selectedTime}
-                                      </p>
+                                {myDogs.length === 0 ? (
+                                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                                    <div className="flex items-start gap-3">
+                                      <div className="grid h-10 w-10 place-items-center rounded-xl bg-white ring-1 ring-slate-200">
+                                        <DogIcon className="h-5 w-5 text-emerald-700" />
+                                      </div>
+                                      <div className="flex-1">
+                                        <p className="text-sm font-semibold text-slate-900">No dogs found</p>
+                                        <p className="mt-0.5 text-sm text-slate-600">
+                                          Add a dog profile first so bookings always include a selected dog.
+                                        </p>
+                                        <Button
+                                          className="mt-3 rounded-full bg-emerald-700 hover:bg-emerald-800"
+                                          onClick={() => navigate('/my-dogs')}
+                                        >
+                                          Add a Dog
+                                        </Button>
+                                      </div>
                                     </div>
-                                  )}
-                                  <Button
-                                    onClick={handleBookService}
-                                    className="w-full bg-green-700 hover:bg-green-800"
-                                    disabled={!selectedDog || !selectedDate || !selectedTime || !selectedDuration}
-                                  >
-                                    Confirm Booking
-                                  </Button>
-                                </div>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-4">
+                                    <div>
+                                      <Label htmlFor="select-dog">Select Dog</Label>
+                                      <Select value={selectedDog} onValueChange={setSelectedDog}>
+                                        <SelectTrigger id="select-dog">
+                                          <SelectValue placeholder="Choose a dog" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {myDogs.map((dog) => (
+                                            <SelectItem key={dog.id} value={dog.id}>
+                                              {dog.name} ({dog.breed})
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div>
+                                      <Label htmlFor="booking-date">Date</Label>
+                                      <Input
+                                        id="booking-date"
+                                        type="date"
+                                        value={selectedDate}
+                                        onChange={(e) => setSelectedDate(e.target.value)}
+                                        min={new Date().toISOString().split('T')[0]}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label htmlFor="booking-time">Time</Label>
+                                      <Input id="booking-time" type="time" value={selectedTime} onChange={(e) => setSelectedTime(e.target.value)} />
+                                    </div>
+                                    <div>
+                                      <Label htmlFor="booking-duration">Duration</Label>
+                                      <Select value={selectedDuration} onValueChange={setSelectedDuration}>
+                                        <SelectTrigger id="booking-duration">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="30">30 minutes</SelectItem>
+                                          <SelectItem value="60">1 hour</SelectItem>
+                                          <SelectItem value="90">1.5 hours</SelectItem>
+                                          <SelectItem value="120">2 hours</SelectItem>
+                                          <SelectItem value="180">3 hours</SelectItem>
+                                          <SelectItem value="240">4 hours</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    {bookingError && <div className="text-red-600 text-sm">{bookingError}</div>}
+                                    {selectedDate && selectedTime && selectedDuration && (
+                                      <div className="p-4 bg-green-50 rounded-lg">
+                                        <p className="text-sm text-gray-600">Estimated Cost:</p>
+                                        <p className="text-2xl font-bold text-green-900">
+                                          R{((provider.hourly_rate || 0) * parseInt(selectedDuration) / 60).toFixed(2)}
+                                        </p>
+                                        <p className="text-xs text-gray-600">
+                                          {format(new Date(selectedDate), 'PPP')} at {selectedTime}
+                                        </p>
+                                      </div>
+                                    )}
+                                    <Button
+                                      onClick={handleBookService}
+                                      className="w-full bg-green-700 hover:bg-green-800"
+                                      disabled={!selectedDog || !selectedDate || !selectedTime || !selectedDuration}
+                                    >
+                                      Confirm Booking
+                                    </Button>
+                                  </div>
+                                )}
                               </DialogContent>
                             </Dialog>
                             <Button variant="outline" className="w-full mt-2" onClick={() => handleViewProviderReviews(provider)}>
