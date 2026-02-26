@@ -531,6 +531,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return Math.round(avgRating * 10) / 10;
   };
 
+  const updateProfile = (userId: string, updates: Partial<User | ProviderProfile | ClientProfile>) => {
+    setUsers(users.map(u => u.id === userId ? { ...u, ...updates } : u));
+    // Also update current user if it's the same user
+    if (currentUser && currentUser.id === userId) {
+      setCurrentUser({ ...currentUser, ...updates });
+    }
+  };
+
   const addDog = (clientId: string, dog: Omit<Dog, 'id'>) => {
     const newDog: Dog = {
       ...dog,
