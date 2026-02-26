@@ -37,16 +37,16 @@ const CompleteProfile = () => {
 
       console.log('[CompleteProfile] Creating profile for user:', user.id);
 
-      // Create profile
+      // Upsert profile to handle cases where profile may already exist partially
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .insert({
+        .upsert({
           id: user.id,
           email: user.email || '',
           full_name: fullName,
           role,
         })
-        .select('id, email, role, full_name, created_at, is_approved, is_suspended')
+        .select('id, email, role, full_name, created_at, is_approved, is_suspended, avatar_url, phone, location, neighborhood, bio, credit_balance, avg_rating, review_count, is_verified, rating, updated_at')
         .single();
 
       if (profileError) {

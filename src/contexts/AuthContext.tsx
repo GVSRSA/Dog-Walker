@@ -44,9 +44,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (user) {
         console.log('[AuthContext] User found:', { id: user.id, email: user.email });
         // Fetch profile from database - using explicit column selection to avoid 406 error
+        // Using a try-catch to handle any column mismatch gracefully
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('id, email, role, full_name, created_at, is_approved, is_suspended')
+          .select('id, email, role, full_name, created_at, is_approved, is_suspended, avatar_url, phone, location, neighborhood, bio, credit_balance, avg_rating, review_count, is_verified, rating, updated_at')
           .eq('id', user.id)
           .single();
         
@@ -98,7 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Fetch profile from database - using explicit column selection to avoid 406 error
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('id, email, role, full_name, created_at, is_approved, is_suspended')
+          .select('id, email, role, full_name, created_at, is_approved, is_suspended, avatar_url, phone, location, neighborhood, bio, credit_balance, avg_rating, review_count, is_verified, rating, updated_at')
           .eq('id', data.user.id)
           .single();
         
@@ -158,7 +159,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             full_name: fullName,
             role,
           })
-          .select('id, email, role, full_name, created_at, is_approved, is_suspended')
+          .select('id, email, role, full_name, created_at, is_approved, is_suspended, avatar_url, phone, location, neighborhood, bio, credit_balance, avg_rating, review_count, is_verified, rating, updated_at')
           .single();
 
         if (profileError) {
