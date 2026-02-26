@@ -51,8 +51,8 @@ const ProviderDashboard = () => {
           const route = routes.find(r => r.bookingId === bookingId);
           if (route && isWalking) {
             const lastPoint = route.points[route.points.length - 1];
-            const newLat = lastPoint ? lastPoint.lat + (Math.random() - 0.5) * 0.001 : 40.7128;
-            const newLng = lastPoint ? lastPoint.lng + (Math.random() - 0.5) * 0.001 : -74.0060;
+            const newLat = lastPoint ? lastPoint.lat + (Math.random() - 0.5) * 0.001 : -26.2041;
+            const newLng = lastPoint ? lastPoint.lng + (Math.random() - 0.5) * 0.001 : 28.0473;
             useApp().addRoutePoint(route.id, newLat, newLng);
           } else {
             clearInterval(interval);
@@ -75,7 +75,7 @@ const ProviderDashboard = () => {
   };
 
   const handlePurchaseCredits = () => {
-    const cost = creditAmount * 5; // $5 per credit
+    const cost = creditAmount * 50; // R50 per credit
     purchaseCredits(provider.id, cost, creditAmount);
     setShowPurchaseModal(false);
     setCreditAmount(10);
@@ -147,7 +147,7 @@ const ProviderDashboard = () => {
               <DollarSign className="h-4 w-4 text-blue-700" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${provider?.hourlyRate || 0}</div>
+              <div className="text-2xl font-bold">R{provider?.hourlyRate || 0}</div>
               <p className="text-xs text-gray-600">per hour</p>
             </CardContent>
           </Card>
@@ -159,7 +159,7 @@ const ProviderDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ${completedBookings.reduce((sum, b) => sum + b.providerPayout, 0).toFixed(2)}
+                R{completedBookings.reduce((sum, b) => sum + b.providerPayout, 0).toFixed(2)}
               </div>
               <p className="text-xs text-gray-600">{completedBookings.length} completed</p>
             </CardContent>
@@ -191,7 +191,7 @@ const ProviderDashboard = () => {
                             <p className="text-sm text-gray-600">{booking.duration} minutes</p>
                           </div>
                           <div className="flex items-center gap-4">
-                            <p className="font-bold text-green-700">${booking.price.toFixed(2)}</p>
+                            <p className="font-bold text-green-700">R{booking.price.toFixed(2)}</p>
                             <Button
                               size="sm"
                               onClick={() => handleConfirmBooking(booking.id)}
@@ -229,7 +229,7 @@ const ProviderDashboard = () => {
                             <p className="text-sm text-gray-600">{booking.duration} minutes</p>
                           </div>
                           <div className="flex items-center gap-4">
-                            <p className="font-bold text-green-700">${booking.price.toFixed(2)}</p>
+                            <p className="font-bold text-green-700">R{booking.price.toFixed(2)}</p>
                             <Button
                               size="sm"
                               onClick={() => handleStartWalk(booking.id)}
@@ -302,7 +302,7 @@ const ProviderDashboard = () => {
                           <TableCell className="font-medium">{client?.name}</TableCell>
                           <TableCell>{new Date(booking.scheduledDate).toLocaleDateString()}</TableCell>
                           <TableCell>{booking.duration} min</TableCell>
-                          <TableCell>${booking.providerPayout.toFixed(2)}</TableCell>
+                          <TableCell>R{booking.providerPayout.toFixed(2)}</TableCell>
                           <TableCell>
                             <Badge variant={
                               booking.status === 'completed' ? 'default' : 'outline'
@@ -344,7 +344,7 @@ const ProviderDashboard = () => {
                   <Input value={provider?.location?.address || ''} placeholder="Your service area" />
                 </div>
                 <div>
-                  <Label>Hourly Rate ($)</Label>
+                  <Label>Hourly Rate (R)</Label>
                   <Input type="number" value={provider?.hourlyRate || 0} />
                 </div>
                 <Button className="w-full bg-green-700 hover:bg-green-800">
@@ -425,7 +425,7 @@ const ProviderDashboard = () => {
                 ))}
               </div>
               <div className="text-center p-4 bg-green-100 rounded-lg">
-                <p className="text-2xl font-bold text-green-900">${(creditAmount * 5).toFixed(2)}</p>
+                <p className="text-2xl font-bold text-green-900">R{(creditAmount * 50).toFixed(2)}</p>
                 <p className="text-sm text-gray-600">Total cost</p>
               </div>
               <div className="flex gap-4">

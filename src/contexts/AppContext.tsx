@@ -129,11 +129,11 @@ const mockUsers: (User | ProviderProfile | ClientProfile)[] = [
     name: 'Sarah Johnson',
     email: 'sarah@paws.com',
     role: 'provider',
-    phone: '+1 555-0101',
+    phone: '+27 82 123 4567',
     bio: 'Experienced dog walker with 5+ years of experience. Certified pet first aid.',
-    location: { lat: 40.7128, lng: -74.0060, address: 'New York, NY' },
+    location: { lat: -26.2041, lng: 28.0473, address: 'Johannesburg, Gauteng' },
     services: ['Walking', 'Pet Sitting', 'Training'],
-    hourlyRate: 25,
+    hourlyRate: 150,
     rating: 4.8,
     totalWalks: 156,
     availableCredits: 10,
@@ -147,11 +147,11 @@ const mockUsers: (User | ProviderProfile | ClientProfile)[] = [
     name: 'Mike Chen',
     email: 'mike@paws.com',
     role: 'provider',
-    phone: '+1 555-0102',
+    phone: '+27 83 456 7890',
     bio: 'Dog lover specializing in large breeds. Professional walker since 2020.',
-    location: { lat: 40.7282, lng: -73.9942, address: 'Brooklyn, NY' },
+    location: { lat: -33.9249, lng: 18.4241, address: 'Cape Town, Western Cape' },
     services: ['Walking', 'Running with Dogs'],
-    hourlyRate: 30,
+    hourlyRate: 180,
     rating: 4.9,
     totalWalks: 203,
     availableCredits: 5,
@@ -165,7 +165,7 @@ const mockUsers: (User | ProviderProfile | ClientProfile)[] = [
     name: 'Emily Davis',
     email: 'emily@paws.com',
     role: 'client',
-    phone: '+1 555-0201',
+    phone: '+27 71 234 5678',
     dogs: [
       { id: 'dog-1', name: 'Max', breed: 'Golden Retriever', age: 3, notes: 'Very friendly, loves to play fetch' },
       { id: 'dog-2', name: 'Bella', breed: 'Labrador', age: 2, notes: 'Energetic, needs longer walks' },
@@ -179,7 +179,7 @@ const mockUsers: (User | ProviderProfile | ClientProfile)[] = [
     name: 'James Wilson',
     email: 'james@paws.com',
     role: 'client',
-    phone: '+1 555-0202',
+    phone: '+27 72 345 6789',
     dogs: [{ id: 'dog-3', name: 'Rocky', breed: 'Bulldog', age: 4, notes: 'Short walks preferred due to breathing' }],
     isApproved: true,
     isSuspended: false,
@@ -196,9 +196,9 @@ const mockBookings: Booking[] = [
     scheduledDate: new Date('2024-12-20T10:00:00'),
     duration: 60,
     status: 'completed',
-    price: 25,
-    platformCommission: 5,
-    providerPayout: 20,
+    price: 150,
+    platformCommission: 30,
+    providerPayout: 120,
     createdAt: new Date('2024-12-19'),
   },
   {
@@ -209,9 +209,9 @@ const mockBookings: Booking[] = [
     scheduledDate: new Date('2024-12-21T14:00:00'),
     duration: 45,
     status: 'active',
-    price: 22.5,
-    platformCommission: 4.5,
-    providerPayout: 18,
+    price: 135,
+    platformCommission: 27,
+    providerPayout: 108,
     createdAt: new Date('2024-12-20'),
     routeId: 'route-1',
   },
@@ -223,9 +223,9 @@ const mockBookings: Booking[] = [
     scheduledDate: new Date('2024-12-22T09:00:00'),
     duration: 60,
     status: 'pending',
-    price: 25,
-    platformCommission: 5,
-    providerPayout: 20,
+    price: 150,
+    platformCommission: 30,
+    providerPayout: 120,
     createdAt: new Date('2024-12-21'),
   },
 ];
@@ -245,9 +245,9 @@ const mockRoutes: Route[] = [
 ];
 
 const mockTransactions: Transaction[] = [
-  { id: 'trans-1', userId: 'provider-1', type: 'credit_purchase', amount: 50, credits: 10, createdAt: new Date('2024-12-15'), description: 'Purchased 10 credits' },
-  { id: 'trans-2', userId: 'provider-1', type: 'booking_fee', amount: 20, bookingId: 'booking-1', createdAt: new Date('2024-12-20'), description: 'Earnings from booking' },
-  { id: 'trans-3', userId: 'provider-2', type: 'credit_purchase', amount: 25, credits: 5, createdAt: new Date('2024-12-18'), description: 'Purchased 5 credits' },
+  { id: 'trans-1', userId: 'provider-1', type: 'credit_purchase', amount: 500, credits: 10, createdAt: new Date('2024-12-15'), description: 'Purchased 10 credits' },
+  { id: 'trans-2', userId: 'provider-1', type: 'booking_fee', amount: 120, bookingId: 'booking-1', createdAt: new Date('2024-12-20'), description: 'Earnings from booking' },
+  { id: 'trans-3', userId: 'provider-2', type: 'credit_purchase', amount: 250, credits: 5, createdAt: new Date('2024-12-18'), description: 'Purchased 5 credits' },
 ];
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -387,7 +387,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .from('tracking_logs')
       .insert({
         booking_id: bookingId,
-        location: `(${40.7128},${-74.0060})`,
+        location: `(${ -26.2041 },${ 28.0473 })`, // Johannesburg coordinates
       });
 
     if (trackingError) {

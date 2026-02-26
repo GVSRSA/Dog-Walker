@@ -32,7 +32,7 @@ const Landing = () => {
           <span className="text-green-700 block">& Pet Services</span>
         </h1>
         <p className="text-xl text-gray-600 mb-10 max-w-2xl mx-auto">
-          Connect with certified dog walkers near you. Track your pup's adventure in real-time
+          Connect with certified dog walkers across South Africa. Track your pup's adventure in real-time
           while they get the exercise they deserve.
         </p>
 
@@ -141,7 +141,7 @@ const Landing = () => {
               </div>
               <h3 className="text-xl font-semibold mb-2">Real-Time Tracking</h3>
               <p className="text-gray-600">
-                Watch your dog's walk in real-time on an interactive map with GPS coordinates
+                Watch your dog's walk in real-time on an interactive map with GPS coordinates across South Africa
               </p>
             </div>
             <div className="text-center">
@@ -150,7 +150,7 @@ const Landing = () => {
               </div>
               <h3 className="text-xl font-semibold mb-2">Verified Providers</h3>
               <p className="text-gray-600">
-                All walkers are background checked, insured, and reviewed by pet parents
+                All walkers are background checked, insured, and reviewed by pet parents throughout South Africa
               </p>
             </div>
             <div className="text-center">
@@ -159,7 +159,7 @@ const Landing = () => {
               </div>
               <h3 className="text-xl font-semibold mb-2">Secure Payments</h3>
               <p className="text-gray-600">
-                Safe, split payments with automatic platform commission tracking
+                Safe payments in South African Rands with automatic platform commission tracking
               </p>
             </div>
           </div>

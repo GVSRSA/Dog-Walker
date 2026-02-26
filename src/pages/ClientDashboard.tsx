@@ -73,8 +73,8 @@ const ClientDashboard = () => {
   const upcomingBookings = myBookings.filter(b => b.status === 'pending');
   const completedBookings = myBookings.filter(b => b.status === 'completed');
 
-  // Simulate client location for distance calculation
-  const clientLocation = { lat: 40.7128, lng: -74.0060 };
+  // Simulate client location for distance calculation (Johannesburg)
+  const clientLocation = { lat: -26.2041, lng: 28.0473 };
 
   const calculateDistance = (provider: any) => {
     if (!provider.location) return null;
@@ -224,7 +224,7 @@ const ClientDashboard = () => {
                         </div>
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                           <DollarSign className="w-4 h-4" />
-                          <span>${provider.hourlyRate}/hour</span>
+                          <span>R{provider.hourlyRate}/hour</span>
                         </div>
                         {provider.bio && (
                           <p className="text-sm text-gray-600 line-clamp-2">{provider.bio}</p>
@@ -301,7 +301,7 @@ const ClientDashboard = () => {
                               <div className="p-4 bg-green-50 rounded-lg">
                                 <p className="text-sm text-gray-600">Estimated Cost:</p>
                                 <p className="text-2xl font-bold text-green-900">
-                                  ${((provider.hourlyRate * parseInt(selectedDuration)) / 60).toFixed(2)}
+                                  R{((provider.hourlyRate * parseInt(selectedDuration)) / 60).toFixed(2)}
                                 </p>
                               </div>
                             )}
