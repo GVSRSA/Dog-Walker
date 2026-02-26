@@ -46,6 +46,11 @@ const Register = () => {
     e.preventDefault();
     setError('');
 
+    if (!fullName) {
+      setError('Full name is required');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -59,10 +64,20 @@ const Register = () => {
     setIsLoading(true);
 
     try {
-      await register(email, password, role);
-      // After registration, redirect to login
-      navigate('/login?registered=true');
+      const profile = await register(email, password, fullName, role);
+      
+      if (profile) {
+        // Redirect to appropriate dashboard based on role
+        if (role === 'provider') {
+          navigate('/provider');
+        } else {
+          navigate('/client');
+        }
+      } else {
+        setError('Registration failed. Please try again.');
+      }
     } catch (err: any) {
+      // Show actual Supabase error messages
       setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setIsLoading(false);

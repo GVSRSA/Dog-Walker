@@ -1,30 +1,13 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-
-interface Profile {
-  id: string;
-  email: string;
-  full_name?: string;
-  role: 'admin' | 'provider' | 'client';
-  is_approved?: boolean;
-  is_suspended?: boolean;
-  bio?: string;
-  location?: { lat: number; lng: number; address?: string };
-  services?: string[];
-  hourly_rate?: number;
-  credit_balance?: number;
-  total_walks?: number;
-  avg_rating?: number;
-  review_count?: number;
-  created_at: string;
-}
+import type { Profile } from '@/types';
 
 interface AuthContextType {
   currentUser: Profile | null;
   setCurrentUser: (user: Profile | null) => void;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<Profile | null>;
-  register: (email: string, password: string, role: 'client' | 'provider') => Promise<void>;
+  register: (email: string, password: string, fullName: string, role: 'client' | 'provider') => Promise<Profile | null>;
   logout: () => void;
 }
 
@@ -90,7 +73,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const register = async (email: string, password: string, role: 'client' | 'provider'): Promise<void> => {
+  const register = async (
+    email: string, 
+    password: string, 
+    fullName: string, 
+    role: 'client' | 'provider'
+  ): Promise<Profile | null> => {
     try {
       // Sign up with Supabase Auth
       const { data, error } = await supabase.auth.signUp({
@@ -103,22 +91,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data.user) {
-        // Create profile in database
+        // Create profile in database with all required fields
         // Note: created_at is handled automatically by the database DEFAULT constraint
-        const { error: profileError } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .insert({
             id: data.user.id,
             email,
+            full_name: fullName,
             role,
             is_approved: false,
             is_suspended: false,
-          });
+          })
+          .select('*')
+          .single();
 
         if (profileError) {
           throw profileError;
         }
+
+        // Set current user state
+        setCurrentUser(profile);
+        setIsAuthenticated(true);
+        
+        return profile;
       }
+
+      return null;
     } catch (err) {
       console.error('Registration error:', err);
       throw err;
