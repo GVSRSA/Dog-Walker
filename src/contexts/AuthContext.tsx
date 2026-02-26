@@ -18,6 +18,28 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper function to safely transform database profile to our Profile type with defaults
+const transformProfile = (dbProfile: any): Profile => {
+  return {
+    id: dbProfile.id || '',
+    email: dbProfile.email || '',
+    full_name: dbProfile.full_name || '',
+    role: dbProfile.role || 'client',
+    is_approved: dbProfile.is_approved ?? false,
+    is_suspended: dbProfile.is_suspended ?? false,
+    bio: dbProfile.bio || undefined,
+    location: dbProfile.location || undefined,
+    services: dbProfile.services || undefined,
+    hourly_rate: dbProfile.hourly_rate || undefined,
+    credit_balance: dbProfile.credit_balance || undefined,
+    total_walks: dbProfile.total_walks || undefined,
+    avg_rating: dbProfile.avg_rating || undefined,
+    review_count: dbProfile.review_count || undefined,
+    created_at: dbProfile.created_at || new Date().toISOString(),
+    updated_at: dbProfile.updated_at || undefined,
+  };
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<Profile | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -43,28 +65,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (user) {
         console.log('[AuthContext] User found:', { id: user.id, email: user.email });
-        // Fetch profile from database - using explicit column selection to avoid 406 error
-        // Using a try-catch to handle any column mismatch gracefully
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, email, role, full_name, created_at, is_approved, is_suspended, avatar_url, phone, location, neighborhood, bio, credit_balance, avg_rating, review_count, is_verified, rating, updated_at')
-          .eq('id', user.id)
-          .single();
-        
-        if (profileError) {
-          console.log('[AuthContext] Profile not found, user needs to complete profile');
-          // User exists in auth but not in profiles - show profile completion screen
+        // Fetch profile from database - using select(*) for simplicity and safety
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+          
+          if (profileError) {
+            // Check for specific error types
+            if (profileError.code === 'PGRST116') {
+              console.log('[AuthContext] Profile not found, user needs to complete profile');
+            } else if (profileError.code === '42P01') {
+              console.error('[AuthContext] Profiles table does not exist:', profileError.message);
+            } else {
+              console.error('[AuthContext] Profile fetch error:', profileError.message, profileError.code);
+            }
+            // User exists in auth but not in profiles - show profile completion screen
+            setCurrentUser(null);
+            setIsAuthenticated(false);
+            setNeedsProfileCompletion(true);
+            return;
+          }
+          
+          if (profile) {
+            console.log('[AuthContext] Profile loaded:', { id: profile.id, role: profile.role });
+            const transformedProfile = transformProfile(profile);
+            setCurrentUser(transformedProfile);
+            setIsAuthenticated(true);
+            setNeedsProfileCompletion(false);
+          }
+        } catch (err) {
+          console.error('[AuthContext] Unexpected error fetching profile:', err);
           setCurrentUser(null);
           setIsAuthenticated(false);
           setNeedsProfileCompletion(true);
-          return;
-        }
-        
-        if (profile) {
-          console.log('[AuthContext] Profile loaded:', { id: profile.id, role: profile.role });
-          setCurrentUser(profile);
-          setIsAuthenticated(true);
-          setNeedsProfileCompletion(false);
         }
       } else {
         // No session - treat as guest (silent fail, no alerts)
@@ -96,24 +132,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('[AuthContext] Auth successful for user:', data.user?.id);
 
       if (data.user) {
-        // Fetch profile from database - using explicit column selection to avoid 406 error
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, email, role, full_name, created_at, is_approved, is_suspended, avatar_url, phone, location, neighborhood, bio, credit_balance, avg_rating, review_count, is_verified, rating, updated_at')
-          .eq('id', data.user.id)
-          .single();
-        
-        if (profileError) {
-          console.error('[AuthContext] Profile fetch failed:', profileError);
-          throw new Error('Profile not found. Please contact support.');
-        }
-        
-        if (profile) {
-          console.log('[AuthContext] Profile loaded, updating auth state:', { id: profile.id, role: profile.role });
-          setCurrentUser(profile);
-          setIsAuthenticated(true);
-          setNeedsProfileCompletion(false);
-          return profile;
+        // Fetch profile from database - using select(*) for simplicity
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', data.user.id)
+            .single();
+          
+          if (profileError) {
+            console.error('[AuthContext] Profile fetch failed:', profileError);
+            
+            // Provide more descriptive error messages
+            if (profileError.code === 'PGRST116') {
+              throw new Error('Profile not found. Please complete your profile setup.');
+            } else if (profileError.code === '42P01') {
+              throw new Error('System error: Profiles table not found. Please contact support.');
+            } else {
+              throw new Error(`Unable to load profile: ${profileError.message}`);
+            }
+          }
+          
+          if (profile) {
+            console.log('[AuthContext] Profile loaded, updating auth state:', { id: profile.id, role: profile.role });
+            const transformedProfile = transformProfile(profile);
+            setCurrentUser(transformedProfile);
+            setIsAuthenticated(true);
+            setNeedsProfileCompletion(false);
+            return transformedProfile;
+          }
+        } catch (err) {
+          console.error('[AuthContext] Unexpected error in login:', err);
+          throw err;
         }
       }
 
@@ -151,32 +201,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // IMPORTANT: Using auth.user.id for the profiles table id column
         console.log('[AuthContext] Creating profile in database with id:', data.user.id);
         
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: data.user.id,  // Using auth.user.id
-            email,
-            full_name: fullName,
-            role,
-          })
-          .select('id, email, role, full_name, created_at, is_approved, is_suspended, avatar_url, phone, location, neighborhood, bio, credit_balance, avg_rating, review_count, is_verified, rating, updated_at')
-          .single();
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: data.user.id,  // Using auth.user.id
+              email,
+              full_name: fullName,
+              role,
+            })
+            .select('*')
+            .single();
 
-        if (profileError) {
-          console.error('[AuthContext] Profile creation failed:', profileError);
-          // Show detailed error message if profile creation fails
-          throw new Error(`Profile creation failed: ${profileError.message}`);
+          if (profileError) {
+            console.error('[AuthContext] Profile creation failed:', profileError);
+            
+            // Check for table not existing error
+            if (profileError.code === '42P01') {
+              throw new Error('System error: Profiles table not found. Please contact support.');
+            }
+            
+            // Show detailed error message if profile creation fails
+            throw new Error(`Profile creation failed: ${profileError.message}`);
+          }
+
+          console.log('[AuthContext] Profile created successfully:', { id: profile.id, role: profile.role });
+          
+          const transformedProfile = transformProfile(profile);
+
+          // Set current user state BEFORE returning
+          setCurrentUser(transformedProfile);
+          setIsAuthenticated(true);
+          
+          console.log('[AuthContext] Registration complete, auth state updated');
+          
+          return transformedProfile;
+        } catch (err) {
+          console.error('[AuthContext] Unexpected error in registration:', err);
+          throw err;
         }
-
-        console.log('[AuthContext] Profile created successfully:', { id: profile.id, role: profile.role });
-
-        // Set current user state BEFORE returning
-        setCurrentUser(profile);
-        setIsAuthenticated(true);
-        
-        console.log('[AuthContext] Registration complete, auth state updated');
-        
-        return profile;
       }
 
       return null;
