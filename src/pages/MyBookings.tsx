@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Booking, Profile, Dog } from '@/types';
-import { CalendarDays, MapPin, PawPrint } from 'lucide-react';
+import { CalendarDays, MapPin, PawPrint, NotebookText, Droplets } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function MyBookings() {
@@ -99,6 +99,8 @@ export default function MyBookings() {
               ? 'bg-slate-100 text-slate-900'
               : 'bg-rose-100 text-rose-900';
 
+    const mapTarget = booking.walk_session_id || booking.id;
+
     return (
       <Card className="rounded-2xl border-slate-200 bg-white">
         <CardHeader className="pb-3">
@@ -133,16 +135,44 @@ export default function MyBookings() {
             </div>
           </div>
 
-          {(booking.status === 'active' || booking.status === 'in_progress') && booking.walk_session_id && (
+          {(booking.status === 'active' || booking.status === 'in_progress') && (
             <Button asChild className="w-full rounded-full bg-emerald-700 hover:bg-emerald-800">
-              <Link to={`/live-walk/${booking.walk_session_id}`}>View live map</Link>
+              <Link to={`/live-walk/${mapTarget}`}>View live map</Link>
             </Button>
           )}
 
-          {booking.status === 'active' && booking.id && !booking.walk_session_id && (
-            <Button asChild className="w-full rounded-full bg-emerald-700 hover:bg-emerald-800">
-              <Link to={`/live-walk/${booking.id}`}>View live map</Link>
-            </Button>
+          {booking.status === 'completed' && (
+            <>
+              <Button asChild variant="outline" className="w-full rounded-full border-slate-200 bg-white text-slate-900 hover:bg-slate-50">
+                <Link to={`/live-walk/${mapTarget}`}>View walk map</Link>
+              </Button>
+
+              {(booking.walk_notes || booking.did_pee || booking.did_poop) && (
+                <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
+                  <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
+                    <NotebookText className="h-4 w-4 text-violet-700" />
+                    Walk Summary
+                  </div>
+                  {booking.walk_notes && (
+                    <p className="mt-2 text-sm font-medium text-slate-700">{booking.walk_notes}</p>
+                  )}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {booking.did_pee && (
+                      <Badge className="rounded-full bg-blue-100 text-blue-900 hover:bg-blue-100">
+                        <Droplets className="mr-1 h-3.5 w-3.5" />
+                        Pee
+                      </Badge>
+                    )}
+                    {booking.did_poop && (
+                      <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">
+                        <Droplets className="mr-1 h-3.5 w-3.5" />
+                        Poop
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

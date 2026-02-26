@@ -550,18 +550,6 @@ const ProviderDashboard = () => {
                               View Live
                             </Button>
                           )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={async () => {
-                              if (!booking.walk_session_id) return;
-                              await supabase.from('bookings').update({ status: 'completed' }).eq('id', booking.id);
-                              await refreshBookings();
-                            }}
-                            className="rounded-full"
-                          >
-                            Mark complete
-                          </Button>
                         </div>
                       </div>
                     ))}

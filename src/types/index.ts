@@ -60,6 +60,9 @@ export interface Booking {
   provider_payout?: number;
   created_at?: string;
   walk_session_id?: string | null;
+  walk_notes?: string | null;
+  did_pee?: boolean | null;
+  did_poop?: boolean | null;
 }
 
 export type WalkSessionStatus = 'active' | 'completed' | 'cancelled';

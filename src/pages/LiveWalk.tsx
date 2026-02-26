@@ -4,11 +4,14 @@ import RoleNavbar from '@/components/RoleNavbar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import type { WalkBreadcrumb, WalkSession } from '@/types';
-import { MapPin, Navigation, Satellite, Square, Users } from 'lucide-react';
+import { MapPin, Navigation, Satellite, Square, Users, NotebookText, Droplets } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function LiveWalk() {
@@ -21,11 +24,19 @@ export default function LiveWalk() {
   const [trail, setTrail] = useState<WalkBreadcrumb[]>([]);
   const [isSharing, setIsSharing] = useState(false);
 
+  const [showSummary, setShowSummary] = useState(false);
+  const [notes, setNotes] = useState('');
+  const [didPee, setDidPee] = useState(false);
+  const [didPoop, setDidPoop] = useState(false);
+  const [savingSummary, setSavingSummary] = useState(false);
+
   const watchIdRef = useRef<number | null>(null);
   const insertCooldownRef = useRef<number>(0);
 
   const isProvider = currentUser?.role === 'provider';
   const isClient = currentUser?.role === 'client';
+
+  const isCompleted = session?.status === 'completed';
 
   const mapSrc = useMemo(() => {
     if (!session?.current_lat || !session?.current_lng) return null;
@@ -39,7 +50,7 @@ export default function LiveWalk() {
     if (!sessionId) return;
 
     const load = async () => {
-      const [{ data: s }, { data: crumbs }] = await Promise.all([
+      const [{ data: s, error: sErr }, { data: crumbs, error: cErr }] = await Promise.all([
         supabase.from('walk_sessions').select('*').eq('id', sessionId).single(),
         supabase
           .from('walk_breadcrumbs')
@@ -48,6 +59,13 @@ export default function LiveWalk() {
           .order('created_at', { ascending: false })
           .limit(10),
       ]);
+
+      if (sErr) {
+        console.error('[live-walk] Failed to load session:', sErr);
+      }
+      if (cErr) {
+        console.error('[live-walk] Failed to load breadcrumbs:', cErr);
+      }
 
       setSession((s as any) || null);
       setTrail(((crumbs as any) || []) as WalkBreadcrumb[]);
@@ -171,17 +189,51 @@ export default function LiveWalk() {
     if (!sessionId) return;
 
     try {
-      await supabase
+      setIsSharing(false);
+
+      const { error: sessionErr } = await supabase
         .from('walk_sessions')
         .update({ status: 'completed', ended_at: new Date().toISOString() })
         .eq('id', sessionId);
+      if (sessionErr) throw sessionErr;
 
-      await supabase.from('bookings').update({ status: 'completed' }).eq('walk_session_id', sessionId);
+      const { error: bookingsErr } = await supabase
+        .from('bookings')
+        .update({ status: 'completed' })
+        .eq('walk_session_id', sessionId);
+      if (bookingsErr) throw bookingsErr;
 
-      toast({ title: 'Walk completed', description: 'The session has ended and all linked bookings were marked completed.' });
-      navigate('/provider', { replace: true });
+      setSession((prev) => (prev ? { ...prev, status: 'completed', ended_at: new Date().toISOString() } : prev));
+      setShowSummary(true);
+
+      toast({ title: 'Walk ended', description: 'All linked bookings were marked completed. Add a quick summary for owners.' });
     } catch (e: any) {
       toast({ title: 'Could not end walk', description: e?.message || 'Please try again.', variant: 'destructive' });
+    }
+  };
+
+  const saveSummary = async () => {
+    if (!sessionId) return;
+
+    setSavingSummary(true);
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({
+          walk_notes: notes.trim() || null,
+          did_pee: didPee,
+          did_poop: didPoop,
+        })
+        .eq('walk_session_id', sessionId);
+
+      if (error) throw error;
+
+      toast({ title: 'Summary sent', description: 'Owners can now see notes + potty updates in their Past Walks.' });
+      navigate('/provider', { replace: true });
+    } catch (e: any) {
+      toast({ title: 'Could not save summary', description: e?.message || 'Please try again.', variant: 'destructive' });
+    } finally {
+      setSavingSummary(false);
     }
   };
 
@@ -245,40 +297,111 @@ export default function LiveWalk() {
             </Card>
 
             <div className="space-y-6">
-              {isProvider && (
+              {isProvider && !showSummary && (
                 <Card className="rounded-2xl border-slate-200 bg-white">
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-base">
                       <Navigation className="h-4 w-4 text-emerald-700" />
-                      Share location
+                      Walk controls
                     </CardTitle>
-                    <CardDescription>Updates the pack position live and drops breadcrumbs.</CardDescription>
+                    <CardDescription>
+                      {isCompleted
+                        ? 'This walk is completed.'
+                        : 'Tap Start to begin sharing location. When you\'re done, End Walk to close the session.'}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <Button
-                      onClick={() => setIsSharing((v) => !v)}
+                      onClick={() => {
+                        if (isCompleted) return;
+                        if (isSharing) {
+                          void endWalk();
+                        } else {
+                          setIsSharing(true);
+                        }
+                      }}
+                      disabled={isCompleted}
                       className={
                         isSharing
                           ? 'w-full rounded-full bg-rose-600 hover:bg-rose-700'
                           : 'w-full rounded-full bg-emerald-700 hover:bg-emerald-800'
                       }
                     >
-                      {isSharing ? 'Stop sharing' : 'Start sharing'}
-                    </Button>
-
-                    <Button
-                      onClick={endWalk}
-                      variant="outline"
-                      className="w-full rounded-full border-slate-200 bg-white text-slate-900 hover:bg-slate-50"
-                    >
-                      <Square className="mr-2 h-4 w-4" />
-                      End walk
+                      {isSharing ? (
+                        <>
+                          <Square className="mr-2 h-4 w-4" />
+                          End Walk
+                        </>
+                      ) : (
+                        <>
+                          <Navigation className="mr-2 h-4 w-4" />
+                          Start Walk
+                        </>
+                      )}
                     </Button>
 
                     <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-100">
                       <p className="text-xs font-semibold text-slate-700">
                         Keep this tab open while walking so clients can follow the pack in real time.
                       </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {isProvider && showSummary && (
+                <Card className="rounded-2xl border-slate-200 bg-white">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <NotebookText className="h-4 w-4 text-violet-700" />
+                      Walk Summary
+                    </CardTitle>
+                    <CardDescription>Send a quick update to the owners for all dogs in this session.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="walk-notes">Notes for the Owners</Label>
+                      <Textarea
+                        id="walk-notes"
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="e.g., Great walk today! We practiced loose-leash walking and had lots of sniff time."
+                        className="min-h-[110px] rounded-2xl"
+                      />
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100">
+                        <Checkbox checked={didPee} onCheckedChange={(v) => setDidPee(Boolean(v))} />
+                        <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                          <Droplets className="h-4 w-4 text-blue-700" />
+                          Pee
+                        </span>
+                      </label>
+                      <label className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100">
+                        <Checkbox checked={didPoop} onCheckedChange={(v) => setDidPoop(Boolean(v))} />
+                        <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                          <Droplets className="h-4 w-4 text-amber-700" />
+                          Poop
+                        </span>
+                      </label>
+                    </div>
+
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <Button
+                        onClick={saveSummary}
+                        disabled={savingSummary}
+                        className="flex-1 rounded-full bg-violet-700 hover:bg-violet-800"
+                      >
+                        {savingSummary ? 'Saving…' : 'Send Summary'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => navigate('/provider', { replace: true })}
+                        className="flex-1 rounded-full border-slate-200 bg-white text-slate-900 hover:bg-slate-50"
+                      >
+                        Skip
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
