@@ -76,6 +76,44 @@ function roleLabel(role?: string | null) {
   }
 }
 
+function getActiveNavKey(args: {
+  role?: string | null;
+  pathname: string;
+  search: string;
+  hash: string;
+}) {
+  const { role, pathname, search, hash } = args;
+
+  if (pathname === '/profile') return 'profile';
+
+  if (pathname.startsWith('/live-walk')) return 'bookings';
+
+  if (role === 'admin') {
+    if (pathname !== '/admin') return undefined;
+    const tab = new URLSearchParams(search).get('tab');
+    if (tab === 'users' || tab === 'dogs' || tab === 'bookings') return tab;
+    return 'dashboard';
+  }
+
+  if (role === 'client') {
+    if (pathname === '/client') return 'dashboard';
+    if (pathname === '/my-dogs') return 'dogs';
+    if (pathname === '/my-bookings') return 'bookings';
+    if (pathname === '/book') return 'find';
+    return undefined;
+  }
+
+  if (role === 'provider') {
+    if (pathname !== '/provider') return undefined;
+    if (hash === '#schedule') return 'schedule';
+    if (hash === '#earnings') return 'earnings';
+    if (hash === '#walks') return 'walks';
+    return 'dashboard';
+  }
+
+  return undefined;
+}
+
 export default function RoleNavbar({ activeKey }: RoleNavbarProps) {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
@@ -83,6 +121,16 @@ export default function RoleNavbar({ activeKey }: RoleNavbarProps) {
 
   const role = currentUser?.role;
   const homeRoute = getHomeRoute(role);
+
+  const derivedActiveKey = getActiveNavKey({
+    role,
+    pathname: location.pathname,
+    search: location.search,
+    hash: location.hash,
+  });
+
+  // Prefer derived highlighting (source of truth). Keep prop as optional override.
+  const resolvedActiveKey = activeKey ?? derivedActiveKey;
 
   let roleItems: NavItem[] = [];
   if (role === 'admin') {
@@ -135,7 +183,7 @@ export default function RoleNavbar({ activeKey }: RoleNavbarProps) {
 
   const PillLink = ({ item }: { item: NavItem }) => {
     const Icon = item.icon;
-    const isActive = activeKey ? activeKey === item.key : false;
+    const isActive = resolvedActiveKey ? resolvedActiveKey === item.key : false;
 
     return (
       <Button
