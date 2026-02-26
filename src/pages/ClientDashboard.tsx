@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 const ClientDashboard = () => {
-  const { bookings, users, createBooking, currentUser, routes, getProviderProfile, submitReview } = useApp();
+  const { bookings, users, createBooking, currentUser, routes, getProviderProfile, submitReview, getReviews } = useApp();
   const { logout } = useAuth();
   const navigate = useNavigate();
   
@@ -31,6 +31,8 @@ const ClientDashboard = () => {
   const [viewingRoute, setViewingRoute] = useState<string | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [ratingBooking, setRatingBooking] = useState<any>(null);
+  const [showProviderReviews, setShowProviderReviews] = useState(false);
+  const [selectedProviderForReviews, setSelectedProviderForReviews] = useState<any>(null);
 
   const client = currentUser as any;
 
@@ -57,6 +59,11 @@ const ClientDashboard = () => {
     
     setShowRatingModal(false);
     setRatingBooking(null);
+  };
+
+  const handleViewProviderReviews = (provider: any) => {
+    setSelectedProviderForReviews(provider);
+    setShowProviderReviews(true);
   };
 
   const handleBookService = () => {
@@ -363,6 +370,14 @@ const ClientDashboard = () => {
                           </div>
                         </DialogContent>
                       </Dialog>
+                      <Button
+                        variant="outline"
+                        className="w-full text-green-700 border-green-300 hover:bg-green-50"
+                        onClick={() => handleViewProviderReviews(provider)}
+                      >
+                        <Star className="w-4 h-4 mr-2" />
+                        View Reviews ({provider.rating})
+                      </Button>
                     </CardContent>
                   </Card>
                 );
@@ -448,6 +463,100 @@ const ClientDashboard = () => {
                   <p className="font-semibold">12 min</p>
                 </div>
               </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Provider Reviews Modal */}
+      {showProviderReviews && selectedProviderForReviews && (
+        <Dialog open={showProviderReviews} onOpenChange={setShowProviderReviews}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center">
+                  <User className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <DialogTitle className="text-2xl">Reviews for {selectedProviderForReviews.name}</DialogTitle>
+                  <DialogDescription>
+                    See what other clients say about this walker
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+            
+            <div className="space-y-6 mt-4">
+              {/* Rating Summary */}
+              <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      className={`w-8 h-8 ${
+                        star <= Math.round(selectedProviderForReviews.rating)
+                          ? 'fill-amber-500 text-amber-500'
+                          : 'text-gray-300'
+                      }`}
+                    />
+                  ))}
+                </div>
+                <div>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {selectedProviderForReviews.rating.toFixed(1)}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    {selectedProviderForReviews.totalWalks} completed walks
+                  </p>
+                </div>
+              </div>
+
+              {/* Reviews List */}
+              {getReviews(selectedProviderForReviews.id).length === 0 ? (
+                <div className="text-center py-12 bg-gray-50 rounded-lg">
+                  <Star className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600">No reviews yet</p>
+                  <p className="text-sm text-gray-500 mt-1">Be the first to review this walker!</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {getReviews(selectedProviderForReviews.id).map((review: any) => {
+                    const reviewer = users.find(u => u.id === review.fromUserId);
+                    return (
+                      <div key={review.id} className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
+                              <User className="w-5 h-5 text-white" />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-gray-900">{reviewer?.name || 'Anonymous'}</p>
+                              <p className="text-xs text-gray-500">
+                                {review.createdAt ? new Date(review.createdAt).toLocaleDateString() : 'N/A'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                className={`w-4 h-4 ${
+                                  star <= review.rating
+                                    ? 'fill-amber-500 text-amber-500'
+                                    : 'text-gray-300'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        {review.comment && (
+                          <p className="text-gray-700 text-sm leading-relaxed">{review.comment}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </DialogContent>
         </Dialog>
