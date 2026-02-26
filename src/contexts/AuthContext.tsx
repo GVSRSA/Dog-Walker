@@ -16,6 +16,7 @@ interface Profile {
   total_walks?: number;
   avg_rating?: number;
   review_count?: number;
+  created_at: string;
 }
 
 interface AuthContextType {
@@ -103,6 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (data.user) {
         // Create profile in database
+        // Note: created_at is handled automatically by the database DEFAULT constraint
         const { error: profileError } = await supabase
           .from('profiles')
           .insert({
@@ -111,7 +113,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             role,
             is_approved: false,
             is_suspended: false,
-            created_at: new Date().toISOString(),
           });
 
         if (profileError) {

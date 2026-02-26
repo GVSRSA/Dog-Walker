@@ -20,7 +20,7 @@ export interface Profile {
   total_walks?: number;
   avg_rating?: number;
   review_count?: number;
-  created_at?: string;
+  created_at: string;
   updated_at?: string;
 }
 
