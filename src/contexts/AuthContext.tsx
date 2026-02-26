@@ -25,7 +25,8 @@ const transformProfile = (dbProfile: any): Profile => {
     email: dbProfile.email || '',
     full_name: dbProfile.full_name || '',
     role: dbProfile.role || 'client',
-    is_approved: dbProfile.is_approved ?? false,
+    // Admins are auto-approved, others default to false
+    is_approved: dbProfile.is_approved ?? dbProfile.role === 'admin',
     is_suspended: dbProfile.is_suspended ?? false,
     bio: dbProfile.bio || undefined,
     location: dbProfile.location || undefined,
@@ -76,17 +77,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (profileError) {
             // Check for specific error types
             if (profileError.code === 'PGRST116') {
+              // Profile not found - user needs to complete profile
               console.log('[AuthContext] Profile not found, user needs to complete profile');
+              setCurrentUser(null);
+              setIsAuthenticated(false);
+              setNeedsProfileCompletion(true);
+              return;
             } else if (profileError.code === '42P01') {
+              // Table does not exist - critical system error
               console.error('[AuthContext] Profiles table does not exist:', profileError.message);
+              setCurrentUser(null);
+              setIsAuthenticated(false);
+              setNeedsProfileCompletion(false);
+              return;
             } else {
+              // Other errors - log but don't trigger profile completion
               console.error('[AuthContext] Profile fetch error:', profileError.message, profileError.code);
+              setCurrentUser(null);
+              setIsAuthenticated(false);
+              setNeedsProfileCompletion(false);
+              return;
             }
-            // User exists in auth but not in profiles - show profile completion screen
-            setCurrentUser(null);
-            setIsAuthenticated(false);
-            setNeedsProfileCompletion(true);
-            return;
           }
           
           if (profile) {
