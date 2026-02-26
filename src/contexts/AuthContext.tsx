@@ -36,6 +36,7 @@ const transformProfile = (dbProfile: any): Profile => {
     location: dbProfile.location || undefined,
     services: dbProfile.services || undefined,
     hourly_rate: dbProfile.hourly_rate || undefined,
+    walk_rate: dbProfile.walk_rate ?? undefined,
     credit_balance: dbProfile.credit_balance || undefined,
     total_walks: dbProfile.total_walks || undefined,
     avg_rating: dbProfile.avg_rating || undefined,

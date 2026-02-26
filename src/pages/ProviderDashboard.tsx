@@ -27,11 +27,24 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 
-function isToday(isoDate?: string | null) {
-  if (!isoDate) return false;
+function isToday(value?: string | null) {
+  if (!value) return false;
   const today = new Date();
-  const [y, m, d] = isoDate.split('-').map((x) => Number(x));
-  return today.getFullYear() === y && today.getMonth() + 1 === m && today.getDate() === d;
+
+  // Date-only format (preferred)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [y, m, d] = value.split('-').map((x) => Number(x));
+    return today.getFullYear() === y && today.getMonth() + 1 === m && today.getDate() === d;
+  }
+
+  // Timestamp / ISO string
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return false;
+  return (
+    parsed.getFullYear() === today.getFullYear() &&
+    parsed.getMonth() === today.getMonth() &&
+    parsed.getDate() === today.getDate()
+  );
 }
 
 const ProviderDashboard = () => {
@@ -120,6 +133,8 @@ const ProviderDashboard = () => {
   };
 
   const handleConfirmBooking = async (bookingId: string) => {
+    if (!bookingId) return;
+
     console.log('[provider-dashboard] Confirm booking clicked', { bookingId });
     setConfirmingId(bookingId);
 
@@ -127,6 +142,7 @@ const ProviderDashboard = () => {
     setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: 'confirmed' } : b)));
 
     try {
+      // IMPORTANT: only flip the status for this single booking.
       const { error } = await supabase
         .from('bookings')
         .update({ status: 'confirmed' })

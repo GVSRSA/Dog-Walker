@@ -10,11 +10,22 @@ import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { CalendarDays, Users, Zap } from 'lucide-react';
 
-function isToday(isoDate?: string | null) {
-  if (!isoDate) return false;
+function isToday(value?: string | null) {
+  if (!value) return false;
   const today = new Date();
-  const [y, m, d] = isoDate.split('-').map((x) => Number(x));
-  return today.getFullYear() === y && today.getMonth() + 1 === m && today.getDate() === d;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [y, m, d] = value.split('-').map((x) => Number(x));
+    return today.getFullYear() === y && today.getMonth() + 1 === m && today.getDate() === d;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return false;
+  return (
+    parsed.getFullYear() === today.getFullYear() &&
+    parsed.getMonth() === today.getMonth() &&
+    parsed.getDate() === today.getDate()
+  );
 }
 
 export default function PackWalkStarter({ providerId, bookings, onCreated }: {
@@ -100,7 +111,7 @@ export default function PackWalkStarter({ providerId, bookings, onCreated }: {
               <Users className="h-4 w-4 text-violet-700" />
               Pack Walk
             </CardTitle>
-            <CardDescription>Select today’s confirmed bookings to start one shared session.</CardDescription>
+            <CardDescription>Select today's confirmed bookings to start one shared session.</CardDescription>
           </div>
           <Badge className="rounded-full bg-violet-100 text-violet-900 hover:bg-violet-100">{todaysConfirmed.length} today</Badge>
         </div>
@@ -110,7 +121,7 @@ export default function PackWalkStarter({ providerId, bookings, onCreated }: {
         {todaysConfirmed.length === 0 ? (
           <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
             <p className="text-sm font-semibold text-slate-800">No confirmed bookings for today.</p>
-            <p className="mt-1 text-sm text-slate-600">When you have confirmed walks scheduled for today, they’ll appear here for selection.</p>
+            <p className="mt-1 text-sm text-slate-600">When you have confirmed walks scheduled for today, they'll appear here for selection.</p>
           </div>
         ) : (
           <>

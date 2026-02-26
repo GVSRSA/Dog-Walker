@@ -18,6 +18,7 @@ export interface Profile {
   };
   services?: string[];
   hourly_rate?: number;
+  walk_rate?: number;
   credit_balance?: number;
   total_walks?: number;
   avg_rating?: number;

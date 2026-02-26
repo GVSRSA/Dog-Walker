@@ -22,6 +22,7 @@ export default function Profile() {
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
+  const [walkRate, setWalkRate] = useState<string>("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -34,6 +35,7 @@ export default function Profile() {
     if (!currentUser) return;
     setFullName(currentUser.full_name || "");
     setPhone(currentUser.phone || "");
+    setWalkRate(currentUser.walk_rate === null || currentUser.walk_rate === undefined ? "" : String(currentUser.walk_rate));
     setAvatarUrl(currentUser.avatar_url || null);
     setAvatarFile(null);
     setAvatarPreview(null);
@@ -116,12 +118,15 @@ export default function Profile() {
     try {
       const nextAvatarUrl = await uploadAvatarIfNeeded();
 
+      const walkRateValue = walkRate.trim() === "" ? null : Number(walkRate);
+
       const { error } = await supabase
         .from("profiles")
         .update({
           full_name: fullName,
           phone: phone || null,
           avatar_url: nextAvatarUrl,
+          ...(currentUser.role === "provider" ? { walk_rate: walkRateValue } : {}),
         })
         .eq("id", currentUser.id);
 
@@ -137,6 +142,7 @@ export default function Profile() {
         full_name: fullName,
         phone: phone || null,
         avatar_url: nextAvatarUrl || null,
+        ...(currentUser.role === "provider" ? { walk_rate: walkRateValue ?? undefined } : {}),
       });
 
       toast({
@@ -274,6 +280,24 @@ export default function Profile() {
                 </div>
               </div>
 
+              {currentUser?.role === "provider" && (
+                <div className="space-y-2">
+                  <Label htmlFor="walkRate">Your Walk Rate</Label>
+                  <Input
+                    id="walkRate"
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step={1}
+                    value={walkRate}
+                    onChange={(e) => setWalkRate(e.target.value)}
+                    className="rounded-2xl"
+                    placeholder="e.g. 250"
+                  />
+                  <p className="text-xs text-slate-500">Used for provider pricing (saved to profiles.walk_rate).</p>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label>Role</Label>
                 <Input value={roleLabel} disabled className="rounded-2xl" />
@@ -300,6 +324,11 @@ export default function Profile() {
                     if (!currentUser) return;
                     setFullName(currentUser.full_name || "");
                     setPhone(currentUser.phone || "");
+                    setWalkRate(
+                      currentUser.walk_rate === null || currentUser.walk_rate === undefined
+                        ? ""
+                        : String(currentUser.walk_rate)
+                    );
                     setAvatarFile(null);
                     if (avatarPreview) URL.revokeObjectURL(avatarPreview);
                     setAvatarPreview(null);
