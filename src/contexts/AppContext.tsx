@@ -34,6 +34,7 @@ export type Dog = {
   name: string;
   breed?: string;
   age?: number;
+  weight?: number;
   notes?: string;
 };
 
@@ -110,6 +111,8 @@ interface AppContextType {
   addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt'>) => void;
   getProviderProfile: (providerId: string) => ProviderProfile | undefined;
   updateProfile: (userId: string, updates: Partial<User | ProviderProfile | ClientProfile>) => void;
+  addDog: (clientId: string, dog: Omit<Dog, 'id'>) => void;
+  removeDog: (clientId: string, dogId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -460,6 +463,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const addDog = (clientId: string, dog: Omit<Dog, 'id'>) => {
+    const newDog: Dog = {
+      ...dog,
+      id: `dog-${Date.now()}`,
+    };
+    setUsers(users.map(u => {
+      if (u.id === clientId && u.role === 'client') {
+        const clientProfile = u as ClientProfile;
+        return {
+          ...clientProfile,
+          dogs: [...(clientProfile.dogs || []), newDog],
+        };
+      }
+      return u;
+    }));
+    // Also update current user if it's the same user
+    if (currentUser && currentUser.id === clientId) {
+      setCurrentUser({
+        ...currentUser,
+        dogs: [...((currentUser as ClientProfile).dogs || []), newDog],
+      });
+    }
+  };
+
+  const removeDog = (clientId: string, dogId: string) => {
+    setUsers(users.map(u => {
+      if (u.id === clientId && u.role === 'client') {
+        const clientProfile = u as ClientProfile;
+        return {
+          ...clientProfile,
+          dogs: (clientProfile.dogs || []).filter(d => d.id !== dogId),
+        };
+      }
+      return u;
+    }));
+    // Also update current user if it's the same user
+    if (currentUser && currentUser.id === clientId) {
+      setCurrentUser({
+        ...currentUser,
+        dogs: ((currentUser as ClientProfile).dogs || []).filter(d => d.id !== dogId),
+      });
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -485,6 +532,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addTransaction,
         getProviderProfile,
         updateProfile,
+        addDog,
+        removeDog,
       }}
     >
       {children}

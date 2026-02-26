@@ -12,17 +12,25 @@ import { useAuth } from '@/contexts/AuthContext';
 import { 
   LogOut, User, MapPin, Phone, Calendar, 
   Shield, Dog, Star, DollarSign, Clock, 
-  CheckCircle, XCircle 
+  CheckCircle, XCircle, Plus, Trash2 
 } from 'lucide-react';
 
 const Profile = () => {
-  const { currentUser, updateProfile } = useApp();
+  const { currentUser, updateProfile, addDog, removeDog } = useApp();
   const { logout } = useAuth();
   const navigate = useNavigate();
 
   const [isEditing, setIsEditing] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | null>(null);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [showAddDogModal, setShowAddDogModal] = useState(false);
+  const [newDog, setNewDog] = useState({
+    name: '',
+    breed: '',
+    age: 0,
+    weight: 0,
+    notes: '',
+  });
 
   // Form state for different user types
   const [formData, setFormData] = useState({
@@ -61,6 +69,27 @@ const Profile = () => {
   const handleLogout = () => {
     logout();
     navigate('/');
+  };
+
+  const handleAddDog = () => {
+    if (!newDog.name || !newDog.breed) return;
+
+    addDog(currentUser!.id, {
+      name: newDog.name,
+      breed: newDog.breed,
+      age: newDog.age || 0,
+      weight: newDog.weight || 0,
+      notes: newDog.notes || '',
+    });
+
+    setNewDog({ name: '', breed: '', age: 0, weight: 0, notes: '' });
+    setShowAddDogModal(false);
+  };
+
+  const handleRemoveDog = (dogId: string) => {
+    if (window.confirm('Are you sure you want to remove this dog?')) {
+      removeDog(currentUser!.id, dogId);
+    }
   };
 
   const handleSave = () => {
@@ -146,24 +175,61 @@ const Profile = () => {
         </div>
 
         <div className="pt-4 border-t">
-          <Label className="text-base font-semibold">My Dogs</Label>
+          <div className="flex items-center justify-between mb-4">
+            <Label className="text-base font-semibold">My Dogs</Label>
+            <Button
+              size="sm"
+              onClick={() => setShowAddDogModal(true)}
+              className="bg-green-700 hover:bg-green-800"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Dog
+            </Button>
+          </div>
           {(currentUser as any).dogs && (currentUser as any).dogs.length > 0 ? (
-            <div className="mt-3 space-y-2">
+            <div className="space-y-3">
               {(currentUser as any).dogs.map((dog: any) => (
-                <div key={dog.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Dog className="w-5 h-5 text-blue-600" />
+                <div key={dog.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                      <Dog className="w-6 h-6 text-blue-600" />
+                    </div>
                     <div>
-                      <p className="font-medium">{dog.name}</p>
-                      <p className="text-sm text-gray-600">{dog.breed} • {dog.age} years old</p>
+                      <p className="font-semibold text-gray-900">{dog.name}</p>
+                      <p className="text-sm text-gray-600">{dog.breed} {dog.age > 0 && `• ${dog.age} years old`}</p>
+                      {dog.notes && (
+                        <p className="text-xs text-gray-500 mt-1 max-w-md truncate">{dog.notes}</p>
+                      )}
                     </div>
                   </div>
-                  <Badge variant="secondary">Active</Badge>
+                  <div className="flex items-center gap-3">
+                    <Badge variant="secondary">Active</Badge>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => handleRemoveDog(dog.id)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-gray-500 mt-2">No dogs registered yet</p>
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
+              <Dog className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-600 mb-2">No dogs registered yet</p>
+              <Button
+                size="sm"
+                onClick={() => setShowAddDogModal(true)}
+                variant="outline"
+                className="text-green-700 border-green-300 hover:bg-green-50"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Your First Dog
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -552,6 +618,92 @@ const Profile = () => {
           </div>
         </div>
       </div>
+
+      {/* Add Dog Modal */}
+      {showAddDogModal && (
+        <Dialog open={showAddDogModal} onOpenChange={setShowAddDogModal}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add New Dog</DialogTitle>
+              <DialogDescription>Register your furry friend in the system</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="dog-name">Name *</Label>
+                <Input
+                  id="dog-name"
+                  placeholder="Dog's name"
+                  value={newDog.name}
+                  onChange={(e) => setNewDog({ ...newDog, name: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="dog-breed">Breed *</Label>
+                <Input
+                  id="dog-breed"
+                  placeholder="e.g., Golden Retriever, Labrador"
+                  value={newDog.breed}
+                  onChange={(e) => setNewDog({ ...newDog, breed: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="dog-age">Age (years)</Label>
+                  <Input
+                    id="dog-age"
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    placeholder="Age"
+                    value={newDog.age || ''}
+                    onChange={(e) => setNewDog({ ...newDog, age: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="dog-weight">Weight (kg)</Label>
+                  <Input
+                    id="dog-weight"
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    placeholder="Weight"
+                    value={newDog.weight || ''}
+                    onChange={(e) => setNewDog({ ...newDog, weight: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="dog-notes">Special Instructions / Notes</Label>
+                <Input
+                  id="dog-notes"
+                  placeholder="e.g., Needs longer walks, food allergies, etc."
+                  value={newDog.notes}
+                  onChange={(e) => setNewDog({ ...newDog, notes: e.target.value })}
+                />
+              </div>
+              <div className="flex gap-4 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowAddDogModal(false);
+                    setNewDog({ name: '', breed: '', age: 0, weight: 0, notes: '' });
+                  }}
+                  className="flex-1 text-green-700 border-green-300 hover:bg-green-50"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleAddDog}
+                  disabled={!newDog.name || !newDog.breed}
+                  className="flex-1 bg-green-700 hover:bg-green-800"
+                >
+                  Add Dog
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Logout Confirmation Dialog */}
       {showLogoutDialog && (
