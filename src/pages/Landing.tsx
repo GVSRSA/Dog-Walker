@@ -5,19 +5,22 @@ import { Dog, MapPin, CreditCard, Shield, Users, Clock } from 'lucide-react';
 
 const Landing = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50">
       {/* Navigation */}
       <nav className="container mx-auto px-4 py-6 flex justify-between items-center">
         <div className="flex items-center gap-2">
-          <Dog className="w-8 h-8 text-orange-500" />
-          <span className="text-2xl font-bold text-gray-800">PawsWalk</span>
+          <Dog className="w-8 h-8 text-green-700" />
+          <div className="flex flex-col">
+            <span className="text-2xl font-bold text-gray-800">Dog Walker</span>
+            <span className="text-xs text-green-600 font-medium">by Jolly Walker</span>
+          </div>
         </div>
         <div className="flex gap-4">
           <Link to="/login">
-            <Button variant="ghost">Log In</Button>
+            <Button variant="ghost" className="text-green-700 hover:text-green-800">Log In</Button>
           </Link>
           <Link to="/register">
-            <Button className="bg-orange-500 hover:bg-orange-600">Get Started</Button>
+            <Button className="bg-green-700 hover:bg-green-800">Get Started</Button>
           </Link>
         </div>
       </nav>
@@ -26,7 +29,7 @@ const Landing = () => {
       <section className="container mx-auto px-4 py-20 text-center">
         <h1 className="text-5xl md:text-7xl font-bold text-gray-900 mb-6">
           Trusted Dog Walking
-          <span className="text-orange-500 block">& Pet Services</span>
+          <span className="text-green-700 block">& Pet Services</span>
         </h1>
         <p className="text-xl text-gray-600 mb-10 max-w-2xl mx-auto">
           Connect with certified dog walkers near you. Track your pup's adventure in real-time
@@ -36,7 +39,7 @@ const Landing = () => {
         {/* Role Cards */}
         <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto mt-16">
           <Link to="/register?role=client">
-            <Card className="hover:shadow-xl transition-shadow cursor-pointer border-2 hover:border-orange-300">
+            <Card className="hover:shadow-xl transition-shadow cursor-pointer border-2 hover:border-green-300">
               <CardHeader>
                 <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Dog className="w-8 h-8 text-blue-600" />
@@ -96,10 +99,10 @@ const Landing = () => {
           </Link>
 
           <Link to="/login?role=admin">
-            <Card className="hover:shadow-xl transition-shadow cursor-pointer border-2 hover:border-purple-300">
+            <Card className="hover:shadow-xl transition-shadow cursor-pointer border-2 hover:border-blue-300">
               <CardHeader>
-                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Shield className="w-8 h-8 text-purple-600" />
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Shield className="w-8 h-8 text-blue-600" />
                 </div>
                 <CardTitle className="text-2xl">Admin Portal</CardTitle>
                 <CardDescription className="text-base">
@@ -109,15 +112,15 @@ const Landing = () => {
               <CardContent>
                 <ul className="space-y-2 text-sm text-gray-600">
                   <li className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-purple-500" />
+                    <Users className="w-4 h-4 text-blue-500" />
                     User management
                   </li>
                   <li className="flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-purple-500" />
+                    <CreditCard className="w-4 h-4 text-blue-500" />
                     Revenue tracking
                   </li>
                   <li className="flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-purple-500" />
+                    <Shield className="w-4 h-4 text-blue-500" />
                     Safety oversight
                   </li>
                 </ul>
@@ -130,11 +133,11 @@ const Landing = () => {
       {/* Features Section */}
       <section className="bg-white py-20">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">Why Choose PawsWalk?</h2>
+          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">Why Choose Dog Walker?</h2>
           <div className="grid md:grid-cols-3 gap-8">
             <div className="text-center">
-              <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <MapPin className="w-10 h-10 text-orange-600" />
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <MapPin className="w-10 h-10 text-green-600" />
               </div>
               <h3 className="text-xl font-semibold mb-2">Real-Time Tracking</h3>
               <p className="text-gray-600">
@@ -166,7 +169,7 @@ const Landing = () => {
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-8">
         <div className="container mx-auto px-4 text-center">
-          <p>&copy; 2024 PawsWalk. All rights reserved.</p>
+          <p>&copy; 2024 Dog Walker by Jolly Walker. All rights reserved.</p>
         </div>
       </footer>
     </div>

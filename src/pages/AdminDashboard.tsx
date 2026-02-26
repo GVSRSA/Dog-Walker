@@ -40,10 +40,11 @@ const AdminDashboard = () => {
       <header className="bg-white border-b sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <Shield className="w-8 h-8 text-purple-600" />
+            <Shield className="w-8 h-8 text-green-700" />
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Admin Dashboard</h1>
-              <p className="text-sm text-gray-600">Welcome, {currentUser?.name}</p>
+              <h1 className="text-xl font-bold text-gray-900">Dog Walker</h1>
+              <p className="text-sm text-green-700 font-medium">by Jolly Walker</p>
+              <p className="text-xs text-gray-600">Welcome, {currentUser?.name}</p>
             </div>
           </div>
           <Button variant="ghost" onClick={handleLogout}>
@@ -59,21 +60,21 @@ const AdminDashboard = () => {
           <Button
             variant={activeTab === 'overview' ? 'default' : 'outline'}
             onClick={() => setActiveTab('overview')}
-            className={activeTab === 'overview' ? 'bg-purple-600 hover:bg-purple-700' : ''}
+            className={activeTab === 'overview' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
           >
             Overview
           </Button>
           <Button
             variant={activeTab === 'users' ? 'default' : 'outline'}
             onClick={() => setActiveTab('users')}
-            className={activeTab === 'users' ? 'bg-purple-600 hover:bg-purple-700' : ''}
+            className={activeTab === 'users' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
           >
             Users ({pendingProviders.length > 0 && pendingProviders.length})
           </Button>
           <Button
             variant={activeTab === 'bookings' ? 'default' : 'outline'}
             onClick={() => setActiveTab('bookings')}
-            className={activeTab === 'bookings' ? 'bg-purple-600 hover:bg-purple-700' : ''}
+            className={activeTab === 'bookings' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
           >
             Bookings
           </Button>
@@ -147,7 +148,7 @@ const AdminDashboard = () => {
                           <Button
                             size="sm"
                             onClick={() => handleApprove(provider.id)}
-                            className="bg-green-600 hover:bg-green-700"
+                            className="bg-green-700 hover:bg-green-800"
                           >
                             <CheckCircle className="w-4 h-4 mr-1" />
                             Approve
@@ -215,7 +216,7 @@ const AdminDashboard = () => {
                           <Button
                             size="sm"
                             onClick={() => handleApprove(user.id)}
-                            className="bg-green-600 hover:bg-green-700"
+                            className="bg-green-700 hover:bg-green-800"
                           >
                             Approve
                           </Button>

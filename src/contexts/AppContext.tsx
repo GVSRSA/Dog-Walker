@@ -101,6 +101,7 @@ interface AppContextType {
   approveUser: (userId: string) => void;
   suspendUser: (userId: string) => void;
   createBooking: (booking: Omit<Booking, 'id' | 'createdAt'>) => void;
+  confirmBooking: (bookingId: string) => Promise<void>;
   updateBookingStatus: (bookingId: string, status: Booking['status']) => Promise<void>;
   addRoutePoint: (routeId: string, lat: number, lng: number) => void;
   startWalk: (bookingId: string) => Promise<void>;
@@ -321,6 +322,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newBooking;
   };
 
+  const confirmBooking = async (bookingId: string) => {
+    // Update booking status to confirmed in Supabase
+    const { error } = await supabase
+      .from('bookings')
+      .update({ status: 'confirmed' })
+      .eq('id', bookingId);
+
+    if (error) {
+      console.error('Error confirming booking:', error);
+      throw error;
+    }
+
+    // Update local state
+    setBookings(bookings.map(b => b.id === bookingId ? { ...b, status: 'confirmed' } : b));
+  };
+
   const updateBookingStatus = async (bookingId: string, status: Booking['status']) => {
     // Update Supabase database
     const { error } = await supabase
@@ -446,6 +463,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         approveUser,
         suspendUser,
         createBooking,
+        confirmBooking,
         updateBookingStatus,
         addRoutePoint,
         startWalk,

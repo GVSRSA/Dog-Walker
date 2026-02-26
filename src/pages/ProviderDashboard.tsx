@@ -85,11 +85,12 @@ const ProviderDashboard = () => {
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-              <MapPin className="w-5 h-5 text-green-600" />
+              <MapPin className="w-5 h-5 text-green-700" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Provider Dashboard</h1>
-              <p className="text-sm text-gray-600">Welcome, {provider?.name}</p>
+              <h1 className="text-xl font-bold text-gray-900">Dog Walker</h1>
+              <p className="text-sm text-green-700 font-medium">by Jolly Walker</p>
+              <p className="text-xs text-gray-600">Welcome, {provider?.name}</p>
             </div>
           </div>
           <Button variant="ghost" onClick={handleLogout}>
@@ -105,7 +106,7 @@ const ProviderDashboard = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Available Credits</CardTitle>
-              <CreditCard className="h-4 w-4 text-green-600" />
+              <CreditCard className="h-4 w-4 text-green-700" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{provider?.availableCredits || 0}</div>
@@ -113,7 +114,7 @@ const ProviderDashboard = () => {
                 size="sm" 
                 variant="outline" 
                 onClick={() => setShowPurchaseModal(true)}
-                className="mt-2"
+                className="mt-2 text-green-700 border-green-300 hover:bg-green-50"
               >
                 Buy More
               </Button>
@@ -123,7 +124,7 @@ const ProviderDashboard = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Rating</CardTitle>
-              <Star className="h-4 w-4 text-yellow-500" />
+              <Star className="h-4 w-4 text-amber-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{provider?.rating || 0}</div>
@@ -134,7 +135,7 @@ const ProviderDashboard = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Hourly Rate</CardTitle>
-              <DollarSign className="h-4 w-4 text-green-600" />
+              <DollarSign className="h-4 w-4 text-blue-700" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">${provider?.hourlyRate || 0}</div>
@@ -145,7 +146,7 @@ const ProviderDashboard = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-blue-600" />
+              <ShoppingCart className="h-4 w-4 text-blue-700" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
@@ -181,12 +182,12 @@ const ProviderDashboard = () => {
                             <p className="text-sm text-gray-600">{booking.duration} minutes</p>
                           </div>
                           <div className="flex items-center gap-4">
-                            <p className="font-bold text-green-600">${booking.price.toFixed(2)}</p>
+                            <p className="font-bold text-green-700">${booking.price.toFixed(2)}</p>
                             <Button
                               size="sm"
                               onClick={() => handleStartWalk(booking.id)}
                               disabled={isWalking}
-                              className="bg-green-600 hover:bg-green-700"
+                              className="bg-green-700 hover:bg-green-800"
                             >
                               <Play className="w-4 h-4 mr-1" />
                               Accept & Start
@@ -201,9 +202,9 @@ const ProviderDashboard = () => {
             </Card>
 
             {activeBookings.length > 0 && (
-              <Card className="border-green-200 bg-green-50">
+              <Card className="border-green-300 bg-green-50">
                 <CardHeader>
-                  <CardTitle className="text-green-800">Active Walk in Progress</CardTitle>
+                  <CardTitle className="text-green-900">Active Walk in Progress</CardTitle>
                   <CardDescription>GPS tracking is active</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -299,7 +300,7 @@ const ProviderDashboard = () => {
                   <Label>Hourly Rate ($)</Label>
                   <Input type="number" value={provider?.hourlyRate || 0} />
                 </div>
-                <Button className="w-full bg-green-600 hover:bg-green-700">
+                <Button className="w-full bg-green-700 hover:bg-green-800">
                   Update Profile
                 </Button>
               </CardContent>
@@ -370,21 +371,21 @@ const ProviderDashboard = () => {
                     key={amount}
                     variant={creditAmount === amount ? 'default' : 'outline'}
                     onClick={() => setCreditAmount(amount)}
-                    className={creditAmount === amount ? 'bg-green-600 hover:bg-green-700' : ''}
+                    className={creditAmount === amount ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
                   >
                     {amount} credits
                   </Button>
                 ))}
               </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <p className="text-2xl font-bold">${(creditAmount * 5).toFixed(2)}</p>
+              <div className="text-center p-4 bg-green-100 rounded-lg">
+                <p className="text-2xl font-bold text-green-900">${(creditAmount * 5).toFixed(2)}</p>
                 <p className="text-sm text-gray-600">Total cost</p>
               </div>
               <div className="flex gap-4">
-                <Button variant="outline" onClick={() => setShowPurchaseModal(false)} className="flex-1">
+                <Button variant="outline" onClick={() => setShowPurchaseModal(false)} className="flex-1 text-green-700 border-green-300 hover:bg-green-50">
                   Cancel
                 </Button>
-                <Button onClick={handlePurchaseCredits} className="flex-1 bg-green-600 hover:bg-green-700">
+                <Button onClick={handlePurchaseCredits} className="flex-1 bg-green-700 hover:bg-green-800">
                   Purchase
                 </Button>
               </div>

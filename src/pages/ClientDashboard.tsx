@@ -94,12 +94,13 @@ const ClientDashboard = () => {
       <header className="bg-white border-b sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              <Dog className="w-5 h-5 text-blue-600" />
+            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+              <Dog className="w-5 h-5 text-green-700" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Client Dashboard</h1>
-              <p className="text-sm text-gray-600">Welcome, {client?.name}</p>
+              <h1 className="text-xl font-bold text-gray-900">Dog Walker</h1>
+              <p className="text-sm text-green-700 font-medium">by Jolly Walker</p>
+              <p className="text-xs text-gray-600">Welcome, {client?.name}</p>
             </div>
           </div>
           <Button variant="ghost" onClick={handleLogout}>
@@ -112,9 +113,9 @@ const ClientDashboard = () => {
       <div className="container mx-auto px-4 py-8">
         {/* Active Walk Alert */}
         {activeBookings.length > 0 && (
-          <Card className="mb-8 border-green-200 bg-green-50">
+          <Card className="mb-8 border-green-300 bg-green-50">
             <CardHeader>
-              <CardTitle className="text-green-800">🎾 Walk in Progress!</CardTitle>
+              <CardTitle className="text-green-900">🎾 Walk in Progress!</CardTitle>
               <CardDescription>Your furry friend is on an adventure</CardDescription>
             </CardHeader>
             <CardContent>
@@ -129,7 +130,7 @@ const ClientDashboard = () => {
                     </p>
                     <Button
                       onClick={() => setViewingRoute(booking.routeId)}
-                      className="bg-green-600 hover:bg-green-700"
+                      className="bg-green-700 hover:bg-green-800"
                     >
                       <Navigation className="w-4 h-4 mr-2" />
                       View Live Map
@@ -146,7 +147,7 @@ const ClientDashboard = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">My Dogs</CardTitle>
-              <Dog className="h-4 w-4 text-blue-600" />
+              <Dog className="h-4 w-4 text-blue-700" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{client?.dogs?.length || 0}</div>
@@ -157,7 +158,7 @@ const ClientDashboard = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Upcoming Walks</CardTitle>
-              <Calendar className="h-4 w-4 text-orange-600" />
+              <Calendar className="h-4 w-4 text-amber-600" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{upcomingBookings.length}</div>
@@ -168,7 +169,7 @@ const ClientDashboard = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Walks</CardTitle>
-              <Star className="h-4 w-4 text-yellow-500" />
+              <Star className="h-4 w-4 text-amber-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{completedBookings.length}</div>
@@ -239,7 +240,7 @@ const ClientDashboard = () => {
                       <Dialog>
                         <DialogTrigger asChild>
                           <Button 
-                            className="w-full bg-blue-600 hover:bg-blue-700"
+                            className="w-full bg-green-700 hover:bg-green-800"
                             onClick={() => setSelectedProvider(provider)}
                           >
                             Book Now
@@ -297,16 +298,16 @@ const ClientDashboard = () => {
                               </Select>
                             </div>
                             {selectedDate && selectedTime && selectedDuration && (
-                              <div className="p-4 bg-blue-50 rounded-lg">
+                              <div className="p-4 bg-green-50 rounded-lg">
                                 <p className="text-sm text-gray-600">Estimated Cost:</p>
-                                <p className="text-2xl font-bold text-blue-600">
+                                <p className="text-2xl font-bold text-green-900">
                                   ${((provider.hourlyRate * parseInt(selectedDuration)) / 60).toFixed(2)}
                                 </p>
                               </div>
                             )}
                             <Button
                               onClick={handleBookService}
-                              className="w-full bg-blue-600 hover:bg-blue-700"
+                              className="w-full bg-green-700 hover:bg-green-800"
                               disabled={!selectedDog || !selectedDate || !selectedTime}
                             >
                               Confirm Booking
