@@ -124,45 +124,67 @@ const Profile = () => {
   };
 
   const handleAddDog = async () => {
-    if (!newDog.name || !newDog.breed) return;
+    if (!newDog.name || !newDog.breed) {
+      alert('Please fill in the required fields (Name and Breed)');
+      return;
+    }
 
     setAddDogStatus(null);
 
+    // Prepare the dog object with proper type conversions
+    // Note: weight is stored as TEXT in the database, so we convert to string
+    const dogData = {
+      owner_id: profile!.id,
+      name: newDog.name,
+      breed: newDog.breed,
+      age: Number(newDog.age) || 0,
+      weight: String(Number(newDog.weight) || 0), // Convert to string for DB TEXT column
+      special_instructions: newDog.special_instructions || '',
+    };
+
+    console.log('[handleAddDog] Attempting to add dog with data:', dogData);
+    console.log('[handleAddDog] Age type:', typeof dogData.age, 'Value:', dogData.age);
+    console.log('[handleAddDog] Weight type:', typeof dogData.weight, 'Value:', dogData.weight);
+
     try {
-      const { error } = await supabase
+      const { error, data } = await supabase
         .from('dogs')
-        .insert({
-          owner_id: profile!.id,
-          name: newDog.name,
-          breed: newDog.breed,
-          age: parseInt(newDog.age.toString(), 10) || 0,
-          weight: parseFloat(newDog.weight.toString()) || 0,
-          special_instructions: newDog.special_instructions || '',
-        });
+        .insert(dogData)
+        .select()
+        .single();
 
       if (error) {
-        console.error('Error adding dog:', error);
+        console.error('[handleAddDog] Error adding dog:', error);
+        console.error('[handleAddDog] Error details:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
         setAddDogStatus('error');
-        alert('Failed to add dog: ' + error.message);
-      } else {
-        setNewDog({ name: '', breed: '', age: 0, weight: 0, special_instructions: '' });
-        setShowAddDogModal(false);
-        setAddDogStatus('success');
-        
-        // Refresh dogs
-        const { data } = await supabase
-          .from('dogs')
-          .select('*')
-          .eq('owner_id', profile!.id)
-          .order('created_at', { ascending: false });
-        setDogs(data || []);
-        
-        alert('🐕 Dog added successfully!');
+        alert(`Failed to add dog: ${error.message}`);
+        return;
       }
+
+      console.log('[handleAddDog] Dog added successfully:', data);
+      
+      setNewDog({ name: '', breed: '', age: 0, weight: 0, special_instructions: '' });
+      setShowAddDogModal(false);
+      setAddDogStatus('success');
+      
+      // Refresh dogs
+      const { data: dogsData } = await supabase
+        .from('dogs')
+        .select('*')
+        .eq('owner_id', profile!.id)
+        .order('created_at', { ascending: false });
+      setDogs(dogsData || []);
+      
+      alert('🐕 Dog added successfully!');
     } catch (err) {
-      console.error('Error:', err);
+      console.error('[handleAddDog] Unexpected error:', err);
       setAddDogStatus('error');
-      alert('Failed to add dog');
+      alert('Failed to add dog. Please try again.');
     }
   };
 
