@@ -96,24 +96,8 @@ export default function BookingPage() {
       return;
     }
 
-    // Re-verify the selected dog belongs to the logged-in user (matches RLS expectations)
-    const { data: dogRow, error: dogVerifyError } = await supabase
-      .from('dogs')
-      .select('id,owner_id')
-      .eq('id', selectedDogId)
-      .maybeSingle();
-
-    if (dogVerifyError || !dogRow) {
-      console.error('[BookingPage] Could not verify selected dog', { dogVerifyError, selectedDogId, userId: user.id });
-      setError('Could not verify the selected dog. Please re-select and try again.');
-      return;
-    }
-
-    if (dogRow.owner_id !== user.id) {
-      console.error('[BookingPage] Dog owner mismatch', { selectedDogId, owner_id: dogRow.owner_id, userId: user.id });
-      setError('That dog does not belong to your account. Please re-select and try again.');
-      return;
-    }
+    // NOTE: For RLS recursion debugging, we intentionally avoid any extra reads (e.g. verifying the dog row)
+    // and perform a single raw INSERT only.
 
     const minutes = Number.parseInt(duration || '60', 10);
     const providerRate = Number(selectedProvider.walk_rate ?? selectedProvider.hourly_rate ?? 0);
@@ -144,7 +128,7 @@ export default function BookingPage() {
       scheduled_at: payload.scheduled_at,
     });
 
-    const { data: inserted, error: insertError } = await supabase.from('bookings').insert(payload).select('id').single();
+    const { error: insertError } = await supabase.from('bookings').insert(payload);
 
     if (insertError) {
       console.error('[BookingPage] Booking insert failed', insertError);
@@ -152,7 +136,7 @@ export default function BookingPage() {
       return;
     }
 
-    console.log('[BookingPage] Booking created', { id: inserted?.id });
+    console.log('[BookingPage] Booking created');
     navigate('/my-bookings', { replace: true });
   };
 
