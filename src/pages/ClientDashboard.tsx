@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +33,8 @@ const ClientDashboard = () => {
   const [ratingBooking, setRatingBooking] = useState<any>(null);
   const [showProviderReviews, setShowProviderReviews] = useState(false);
   const [selectedProviderForReviews, setSelectedProviderForReviews] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
 
   const client = currentUser as any;
 
@@ -75,6 +77,18 @@ const ClientDashboard = () => {
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.location?.address.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Pagination logic
+  const totalProviders = filteredProviders.length;
+  const totalPages = Math.ceil(totalProviders / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const displayedProviders = filteredProviders.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const myBookings = bookings.filter(b => b.clientId === client?.id);
   const activeBookings = myBookings.filter(b => b.status === 'active');
@@ -249,7 +263,7 @@ const ClientDashboard = () => {
             </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredProviders.map((provider) => {
+              {displayedProviders.map((provider) => {
                 const distance = calculateDistance(provider);
                 return (
                   <Card key={provider.id} className="hover:shadow-lg transition-shadow">
@@ -383,6 +397,112 @@ const ClientDashboard = () => {
                 );
               })}
             </div>
+
+            {/* Pagination Controls */}
+            {totalProviders > 0 && (
+              <div className="mt-6 space-y-4">
+                {/* Results Info and Items Per Page */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="text-sm text-gray-600">
+                    Showing <span className="font-semibold">{Math.min(startIndex + 1, totalProviders)}</span> to{' '}
+                    <span className="font-semibold">{Math.min(endIndex, totalProviders)}</span> of{' '}
+                    <span className="font-semibold">{totalProviders}</span> providers
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="itemsPerPage" className="text-sm whitespace-nowrap">
+                      Per page:
+                    </Label>
+                    <Select
+                      value={itemsPerPage.toString()}
+                      onValueChange={(value) => setItemsPerPage(parseInt(value))}
+                    >
+                      <SelectTrigger className="w-[100px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="25">25</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="75">75</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Pagination Buttons */}
+                {totalPages > 1 && (
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="text-green-700 border-green-300 hover:bg-green-50 disabled:opacity-50"
+                    >
+                      Previous
+                    </Button>
+
+                    {/* Page Numbers */}
+                    <div className="flex flex-wrap items-center gap-1">
+                      {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 7) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 4) {
+                          pageNum = i < 5 ? i + 1 : (i === 5 ? '...' : totalPages);
+                        } else if (currentPage >= totalPages - 3) {
+                          pageNum = i < 2 ? (i === 0 ? 1 : '...') : totalPages - 6 + i;
+                        } else {
+                          pageNum = i === 0 ? 1 : i === 6 ? totalPages : currentPage - 3 + i;
+                        }
+
+                        if (pageNum === '...') {
+                          return (
+                            <span key={i} className="px-3 py-2 text-gray-500">
+                              ...
+                            </span>
+                          );
+                        }
+
+                        return (
+                          <Button
+                            key={i}
+                            variant={currentPage === pageNum ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setCurrentPage(pageNum as number)}
+                            className={
+                              currentPage === pageNum
+                                ? 'bg-green-700 hover:bg-green-800'
+                                : 'text-green-700 border-green-300 hover:bg-green-50'
+                            }
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      })}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="text-green-700 border-green-300 hover:bg-green-50 disabled:opacity-50"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {totalProviders === 0 && (
+              <div className="text-center py-12 bg-gray-50 rounded-lg">
+                <Search className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-600">No providers found</p>
+                <p className="text-sm text-gray-500 mt-1">Try adjusting your search terms</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
