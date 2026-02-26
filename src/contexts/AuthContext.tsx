@@ -67,6 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (user) {
         console.log('[AuthContext] User found:', { id: user.id, email: user.email });
         // Fetch profile from database - using select(*) for simplicity and safety
+        // ALWAYS fetch fresh data on page load - don't use cached values
         try {
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
@@ -101,8 +102,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           
           if (profile) {
-            console.log('[AuthContext] Profile loaded:', { id: profile.id, role: profile.role });
+            console.log('[AuthContext] Profile loaded from DB:', { 
+              id: profile.id, 
+              role: profile.role, 
+              is_approved: profile.is_approved,
+              full_name: profile.full_name
+            });
             const transformedProfile = transformProfile(profile);
+            console.log('[AuthContext] Transformed profile with admin auto-approval:', { 
+              id: transformedProfile.id, 
+              role: transformedProfile.role, 
+              is_approved: transformedProfile.is_approved 
+            });
             setCurrentUser(transformedProfile);
             setIsAuthenticated(true);
             setNeedsProfileCompletion(false);

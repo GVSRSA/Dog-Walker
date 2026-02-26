@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { Dog } from 'lucide-react';
+import { Dog, RefreshCw } from 'lucide-react';
 import type { Profile } from '@/types';
 
 const Login = () => {
@@ -13,6 +13,7 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -47,6 +48,40 @@ const Login = () => {
       console.error('[Login] Login error:', err);
       setError(err.message || 'Invalid email or password');
       setIsLoading(false);
+    }
+  };
+
+  const handleHardReset = async () => {
+    setIsResetting(true);
+    setError('');
+    
+    try {
+      console.log('[Login] Performing hard reset...');
+      
+      // Sign out from Supabase
+      await import('@/integrations/supabase/client').then(({ supabase }) => {
+        supabase.auth.signOut();
+      });
+      
+      // Clear all localStorage
+      localStorage.clear();
+      
+      // Clear all sessionStorage
+      sessionStorage.clear();
+      
+      console.log('[Login] Hard reset complete - cleared all sessions and storage');
+      
+      // Redirect to landing page
+      navigate('/', { replace: true });
+      
+      // After a brief delay, reload page to ensure clean state
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    } catch (err) {
+      console.error('[Login] Hard reset error:', err);
+      setError('Reset failed. Please try clearing your browser cache manually.');
+      setIsResetting(false);
     }
   };
 
@@ -95,10 +130,28 @@ const Login = () => {
                 required
               />
             </div>
-            <Button type="submit" className="w-full bg-green-700 hover:bg-green-800" disabled={isLoading}>
+            <Button type="submit" className="w-full bg-green-700 hover:bg-green-800" disabled={isLoading || isResetting}>
               {isLoading ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
+          
+          {/* Hard Reset Button */}
+          <div className="mt-4 pt-4 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleHardReset}
+              disabled={isResetting}
+              className="w-full border-amber-300 text-amber-700 hover:bg-amber-50"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${isResetting ? 'animate-spin' : ''}`} />
+              {isResetting ? 'Resetting...' : 'Hard Reset Session'}
+            </Button>
+            <p className="text-xs text-gray-500 mt-2 text-center">
+              Use this if you're seeing cached/incorrect role information
+            </p>
+          </div>
+          
           <div className="mt-6 text-center text-sm">
             <span className="text-gray-600">Don't have an account? </span>
             <Link to="/register" className="text-green-700 hover:underline font-medium">
