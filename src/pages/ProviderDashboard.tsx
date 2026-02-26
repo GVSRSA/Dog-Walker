@@ -80,7 +80,7 @@ const ProviderDashboard = () => {
       console.error('[provider-dashboard] Error fetching bookings:', error);
       return;
     }
-    setBookings(data || []);
+    setBookings((data || []) as Booking[]);
   }
 
   useEffect(() => {
@@ -123,6 +123,10 @@ const ProviderDashboard = () => {
       return dogNamesById[dogId] || 'Dog';
     };
   }, [dogNamesById]);
+
+  const bookingDogName = useMemo(() => {
+    return (booking: Booking) => booking?.dogs?.name || dogLabel(booking.dog_id);
+  }, [dogLabel]);
 
   // Fetch bookings for provider
   useEffect(() => {
@@ -466,7 +470,7 @@ const ProviderDashboard = () => {
                     {pendingBookings.map((booking) => (
                       <div key={booking.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                         <div>
-                          <p className="font-semibold">{dogLabel(booking.dog_id)}</p>
+                          <p className="font-semibold">{bookingDogName(booking)}</p>
                           <p className="text-sm text-gray-600">
                             {booking.scheduled_at && format(new Date(booking.scheduled_at), 'PPP')} at{' '}
                             {booking.scheduled_at && format(new Date(booking.scheduled_at), 'HH:mm')}
@@ -502,7 +506,7 @@ const ProviderDashboard = () => {
                     {todaysConfirmedBookings.map((booking) => (
                       <div key={booking.id} className="flex items-center justify-between p-4 bg-white rounded-lg">
                         <div className="min-w-0">
-                          <p className="truncate font-semibold text-slate-900">{dogLabel(booking.dog_id)}</p>
+                          <p className="truncate font-semibold text-slate-900">{bookingDogName(booking)}</p>
                           <p className="text-sm text-gray-600">
                             {booking.scheduled_at ? (
                               <>
@@ -537,7 +541,7 @@ const ProviderDashboard = () => {
                     {inProgressBookings.map((booking) => (
                       <div key={booking.id} className="flex items-center justify-between p-4 bg-white rounded-lg">
                         <div>
-                          <p className="font-semibold">{dogLabel(booking.dog_id)}</p>
+                          <p className="font-semibold">{bookingDogName(booking)}</p>
                           <p className="text-sm text-gray-600">Session: {booking.walk_session_id?.slice(0, 8)}...</p>
                         </div>
                         <div className="flex items-center gap-3">
@@ -569,7 +573,7 @@ const ProviderDashboard = () => {
                   {activeBookings.map((booking) => (
                     <div key={booking.id} className="flex items-center justify-between">
                       <div>
-                        <p className="font-semibold">Walking {dogLabel(booking.dog_id)}</p>
+                        <p className="font-semibold">Walking {bookingDogName(booking)}</p>
                         <p className="text-sm text-gray-600">Tracking location...</p>
                       </div>
                       <Button size="sm" onClick={() => handleEndWalk(booking.id)} className="bg-red-600 hover:bg-red-700">
@@ -611,7 +615,7 @@ const ProviderDashboard = () => {
                     <TableBody>
                       {[...completedBookings, ...bookings.filter((b) => b.status === 'cancelled')].map((booking) => (
                         <TableRow key={booking.id}>
-                          <TableCell className="font-medium">{dogLabel(booking.dog_id)}</TableCell>
+                          <TableCell className="font-medium">{bookingDogName(booking)}</TableCell>
                           <TableCell>{booking.scheduled_at && format(new Date(booking.scheduled_at), 'PPP')}</TableCell>
                           <TableCell>-</TableCell>
                           <TableCell>R{booking.provider_payout?.toFixed(2) || '0.00'}</TableCell>

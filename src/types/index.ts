@@ -63,6 +63,7 @@ export interface Booking {
   walk_notes?: string | null;
   did_pee?: boolean | null;
   did_poop?: boolean | null;
+  dogs?: { name: string } | null;
 }
 
 export type WalkSessionStatus = 'active' | 'completed' | 'cancelled';

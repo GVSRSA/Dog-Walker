@@ -78,7 +78,8 @@ export const fetchProfile = async (userId: string): Promise<Profile | null> => {
  */
 export const fetchBookings = async (userId: string, role: 'client' | 'provider' = 'client'): Promise<{ data: Booking[]; error: any }> => {
   try {
-    let query = supabase.from('bookings').select('*');
+    // Include dog name so dashboards can render a real schedule.
+    let query = supabase.from('bookings').select('*, dogs(name)');
     
     if (role === 'client') {
       query = query.eq('client_id', userId);
@@ -97,7 +98,7 @@ export const fetchBookings = async (userId: string, role: 'client' | 'provider' 
       return { data: [], error };
     }
   
-    return { data: data || [], error: null };
+    return { data: (data || []) as any, error: null };
   } catch (err) {
     console.error('Error in fetchBookings:', err);
     return { data: [], error: err };
