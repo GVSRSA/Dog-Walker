@@ -14,7 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Profile, Dog, Booking, Review } from '@/types';
 import {
   LogOut, Search, Dog as DogIcon, User, Calendar, Star,
-  DollarSign, Navigation, Clock
+  DollarSign, Navigation, Clock, MapPin
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -44,6 +44,9 @@ const ClientDashboard = () => {
   const [loadingBookings, setLoadingBookings] = useState(false);
   const [providerReviews, setProviderReviews] = useState<Review[]>([]);
   const [bookingError, setBookingError] = useState('');
+  const [breadcrumbs, setBreadcrumbs] = useState<any[]>([]);
+  const [loadingBreadcrumbs, setLoadingBreadcrumbs] = useState(false);
+  const [activeWalkBreadcrumbs, setActiveWalkBreadcrumbs] = useState<any[]>([]);
 
   // Fetch dogs for current user
   useEffect(() => {
@@ -138,6 +141,44 @@ const ClientDashboard = () => {
       fetchProviderReviewsData();
     }
   }, [selectedProviderForReviews?.id]);
+
+  // Fetch breadcrumbs for active walk
+  useEffect(() => {
+    const activeBooking = bookings.find(b => b.status === 'active');
+    if (!activeBooking?.id) {
+      setActiveWalkBreadcrumbs([]);
+      return;
+    }
+
+    const fetchBreadcrumbs = async () => {
+      setLoadingBreadcrumbs(true);
+      try {
+        const { data, error } = await supabase
+          .from('walk_breadcrumbs')
+          .select('*')
+          .eq('walk_session_id', activeBooking.id)
+          .order('created_at', { ascending: false })
+          .limit(10); // Show last 10 breadcrumbs
+
+        if (error) {
+          console.error('Error fetching breadcrumbs:', error);
+        } else {
+          setActiveWalkBreadcrumbs(data || []);
+        }
+      } catch (err) {
+        console.error('Error:', err);
+      } finally {
+        setLoadingBreadcrumbs(false);
+      }
+    };
+
+    fetchBreadcrumbs();
+
+    // Refresh breadcrumbs every 30 seconds for active walk
+    const refreshInterval = setInterval(fetchBreadcrumbs, 30000);
+    
+    return () => clearInterval(refreshInterval);
+  }, [bookings]);
 
   const handleLogout = async () => {
     await logout();
@@ -421,27 +462,81 @@ const ClientDashboard = () => {
               {activeBookings.map((booking) => {
                 const provider = providers.find(p => p.id === booking.provider_id);
                 return (
-                  <div key={booking.id} className="flex items-center justify-between p-4 bg-white rounded-lg border border-green-200 mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                        <User className="w-6 h-6 text-green-700" />
+                  <div key={booking.id}>
+                    <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-green-200 mb-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                          <User className="w-6 h-6 text-green-700" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-900">{provider?.full_name}</p>
+                          <p className="text-sm text-gray-600">
+                            {booking.scheduled_at && format(new Date(booking.scheduled_at), 'PPP')} at {booking.scheduled_at && format(new Date(booking.scheduled_at), 'HH:mm')}
+                          </p>
+                          <p className="text-sm text-gray-600">• R{booking.total_fee?.toFixed(2) || 'N/A'}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-semibold text-gray-900">{provider?.full_name}</p>
-                        <p className="text-sm text-gray-600">
-                          {booking.scheduled_at && format(new Date(booking.scheduled_at), 'PPP')} at {booking.scheduled_at && format(new Date(booking.scheduled_at), 'HH:mm')}
-                        </p>
-                        <p className="text-sm text-gray-600">• R{booking.total_fee?.toFixed(2) || 'N/A'}</p>
-                      </div>
+                      <Button
+                        size="sm"
+                        className="bg-green-700 hover:bg-green-800"
+                        disabled
+                      >
+                        <Navigation className="w-4 h-4 mr-2" />
+                        GPS Tracking Active
+                      </Button>
                     </div>
-                    <Button
-                      size="sm"
-                      className="bg-green-700 hover:bg-green-800"
-                      disabled
-                    >
-                      <Navigation className="w-4 h-4 mr-2" />
-                      View Live Map
-                    </Button>
+
+                    {/* Last Known Locations */}
+                    <div className="bg-white rounded-lg border border-green-200 p-4">
+                      <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-green-700" />
+                        Last Known Locations
+                      </h4>
+                      {loadingBreadcrumbs ? (
+                        <div className="text-center py-4 text-gray-500">
+                          <div className="animate-spin rounded-full h-6 w-6 border-2 border-green-700 border-t-transparent mx-auto mb-2"></div>
+                          <p className="text-sm">Loading location data...</p>
+                        </div>
+                      ) : activeWalkBreadcrumbs.length === 0 ? (
+                        <p className="text-sm text-gray-500 text-center py-4">No location data yet. Walk just started!</p>
+                      ) : (
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                          {activeWalkBreadcrumbs.map((crumb, index) => (
+                            <div key={crumb.id} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {index === 0 ? 'Latest' : `-${index}`}
+                                </Badge>
+                                <span className="text-gray-600">
+                                  Lat: {crumb.lat?.toFixed(6)}, Lng: {crumb.lng?.toFixed(6)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-500">
+                                  {crumb.created_at && format(new Date(crumb.created_at), 'HH:mm:ss')}
+                                </span>
+                                {index === 0 && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-xs"
+                                    asChild
+                                  >
+                                    <a
+                                      href={`https://www.google.com/maps?q=${crumb.lat},${crumb.lng}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      View on Google Maps
+                                    </a>
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}

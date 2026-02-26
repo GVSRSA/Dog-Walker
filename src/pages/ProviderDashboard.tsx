@@ -32,7 +32,7 @@ const ProviderDashboard = () => {
   const [isWalking, setIsWalking] = useState(false);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [creditAmount, setCreditAmount] = useState(10);
-  const [watchId, setWatchId] = useState<number | null>(null);
+  const [trackingInterval, setTrackingInterval] = useState<NodeJS.Timeout | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [ratingBooking, setRatingBooking] = useState<Booking | null>(null);
 
@@ -137,25 +137,54 @@ const ProviderDashboard = () => {
       setActiveBookingId(bookingId);
       setIsWalking(true);
 
-      // Start geolocation tracking
-      if ('geolocation' in navigator) {
-        const id = navigator.geolocation.watchPosition(
+      // Start geolocation tracking with setInterval (every 5 minutes)
+      const trackLocation = async () => {
+        if (!('geolocation' in navigator)) {
+          console.log('[GPS] Geolocation not supported');
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
           async (position) => {
             const { latitude, longitude } = position.coords;
-            // In production, this would send to Supabase tracking_logs table
-            console.log('Tracking:', { latitude, longitude });
+            
+            // Insert breadcrumb into walk_breadcrumbs table
+            try {
+              const { error: insertError } = await supabase
+                .from('walk_breadcrumbs')
+                .insert({
+                  walk_session_id: bookingId,
+                  lat: latitude,
+                  lng: longitude,
+                });
+
+              if (insertError) {
+                console.error('[GPS] Failed to save breadcrumb:', insertError);
+              } else {
+                console.log('[GPS] Breadcrumb saved:', { latitude, longitude, bookingId });
+              }
+            } catch (err) {
+              console.error('[GPS] Error saving breadcrumb:', err);
+            }
           },
           (error) => {
-            console.error('Geolocation error:', error);
+            // Silent error handling - don't alert, just log
+            console.log('[GPS] Failed to get location:', error.message);
           },
           {
             enableHighAccuracy: true,
-            timeout: 5000,
-            maximumAge: 0,
+            timeout: 10000,
+            maximumAge: 60000, // Accept locations up to 1 minute old
           }
         );
-        setWatchId(id);
-      }
+      };
+
+      // Capture initial location immediately
+      trackLocation();
+
+      // Set up interval for tracking every 5 minutes
+      const intervalId = setInterval(trackLocation, 5 * 60 * 1000); // 5 minutes in milliseconds
+      setTrackingInterval(intervalId);
 
       // Refresh bookings
       const { data, error: fetchError } = await fetchBookings(currentUser.id, 'provider');
@@ -171,9 +200,9 @@ const ProviderDashboard = () => {
   const handleEndWalk = async (bookingId: string) => {
     try {
       // Stop geolocation tracking
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-        setWatchId(null);
+      if (trackingInterval !== null) {
+        clearInterval(trackingInterval);
+        setTrackingInterval(null);
       }
 
       const { error } = await supabase
@@ -199,6 +228,17 @@ const ProviderDashboard = () => {
       alert('Failed to end walk');
     }
   };
+
+  // Cleanup interval on component unmount or when walk stops
+  useEffect(() => {
+    return () => {
+      if (trackingInterval !== null) {
+        console.log('[GPS] Cleaning up tracking interval');
+        clearInterval(trackingInterval);
+        setTrackingInterval(null);
+      }
+    };
+  }, [trackingInterval]);
 
   const handlePurchaseCredits = async () => {
     try {
