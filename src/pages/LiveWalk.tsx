@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import type { WalkBreadcrumb, WalkSession } from '@/types';
-import { MapPin, Navigation, Satellite, Square, Users, NotebookText, Droplets, Crosshair } from 'lucide-react';
+import { MapPin, Navigation, Satellite, Square, Users, NotebookText, Droplets, Crosshair, Receipt, Wallet } from 'lucide-react';
 import { format } from 'date-fns';
 
 const FALLBACK_CENTER = {
@@ -46,6 +48,11 @@ function parseProfileLocationToLatLng(value?: unknown): { lat: number; lng: numb
   return null;
 }
 
+function formatZAR(amount: number) {
+  const safe = Number.isFinite(amount) ? amount : 0;
+  return `R${safe.toFixed(2)}`;
+}
+
 export default function LiveWalk() {
   const { bookingId } = useParams();
   const sessionId = bookingId;
@@ -62,6 +69,9 @@ export default function LiveWalk() {
   const [didPee, setDidPee] = useState(false);
   const [didPoop, setDidPoop] = useState(false);
   const [savingSummary, setSavingSummary] = useState(false);
+
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [receipt, setReceipt] = useState<{ spent: number; newBalance: number } | null>(null);
 
   const watchIdRef = useRef<number | null>(null);
   const insertCooldownRef = useRef<number>(0);
@@ -186,10 +196,7 @@ export default function LiveWalk() {
     if (!sessionId) return;
 
     const loadDuration = async () => {
-      const { data, error } = await supabase
-        .from('bookings')
-        .select('duration')
-        .eq('walk_session_id', sessionId);
+      const { data, error } = await supabase.from('bookings').select('duration').eq('walk_session_id', sessionId);
 
       if (error) {
         console.error('[live-walk] Failed to load booking durations:', error);
@@ -354,9 +361,7 @@ export default function LiveWalk() {
           permissionToastRef.current = true;
           toast({
             title: 'GPS permission required',
-            description:
-              err?.message ||
-              'Please allow location permissions for this site so clients can follow the live walk.',
+            description: err?.message || 'Please allow location permissions for this site so clients can follow the live walk.',
             variant: 'destructive',
           });
         }
@@ -384,19 +389,36 @@ export default function LiveWalk() {
   const endWalk = async () => {
     if (!sessionId) return;
 
+    // Safety check: do nothing if the walk is already marked completed in local state.
+    if (session?.status === 'completed') {
+      toast({ title: 'Already ended', description: 'This walk has already been completed.' });
+      return;
+    }
+
     try {
       setIsSharing(false);
+
+      // Safety check: only the walker can complete a session, and only once.
+      const { data: current, error: fetchErr } = await supabase
+        .from('walk_sessions')
+        .select('status')
+        .eq('id', sessionId)
+        .single();
+      if (fetchErr) throw fetchErr;
+      if ((current as any)?.status === 'completed') {
+        setSession((prev) => (prev ? { ...prev, status: 'completed' } : prev));
+        toast({ title: 'Already ended', description: 'This walk has already been completed.' });
+        return;
+      }
 
       const { error: sessionErr } = await supabase
         .from('walk_sessions')
         .update({ status: 'completed', ended_at: new Date().toISOString() })
-        .eq('id', sessionId);
+        .eq('id', sessionId)
+        .eq('status', 'active');
       if (sessionErr) throw sessionErr;
 
-      const { error: bookingsErr } = await supabase
-        .from('bookings')
-        .update({ status: 'completed' })
-        .eq('walk_session_id', sessionId);
+      const { error: bookingsErr } = await supabase.from('bookings').update({ status: 'completed' }).eq('walk_session_id', sessionId);
       if (bookingsErr) throw bookingsErr;
 
       setSession((prev) => (prev ? { ...prev, status: 'completed', ended_at: new Date().toISOString() } : prev));
@@ -405,6 +427,32 @@ export default function LiveWalk() {
       toast({ title: 'Walk ended', description: 'All linked bookings were marked completed. Add a quick summary for owners.' });
     } catch (e: any) {
       toast({ title: 'Could not end walk', description: e?.message || 'Please try again.', variant: 'destructive' });
+    }
+  };
+
+  const showClientReceipt = async () => {
+    if (!sessionId || !isClient) return;
+
+    try {
+      const [{ data: bookings, error: bookingErr }, { data: myProfile, error: profileErr }] = await Promise.all([
+        supabase.from('bookings').select('total_fee').eq('walk_session_id', sessionId),
+        supabase.from('profiles').select('credit_balance').eq('id', currentUser?.id).single(),
+      ]);
+
+      if (bookingErr) throw bookingErr;
+      if (profileErr) throw profileErr;
+
+      const spent = (bookings || []).reduce((sum, b: any) => sum + Number(b?.total_fee ?? 0), 0);
+      const newBalance = Number((myProfile as any)?.credit_balance ?? 0);
+
+      setReceipt({ spent, newBalance });
+      setShowReceipt(true);
+    } catch (e: any) {
+      toast({
+        title: 'Could not load receipt',
+        description: e?.message || 'Please try again.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -437,6 +485,41 @@ export default function LiveWalk() {
     <div className="min-h-screen bg-slate-50">
       <RoleNavbar />
 
+      <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
+        <DialogContent className="overflow-hidden rounded-3xl border-slate-200 p-0">
+          <div className="bg-violet-700 px-6 py-5">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base font-extrabold text-white">
+                <Receipt className="h-4 w-4" />
+                Walk Receipt
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+          <div className="space-y-4 p-6">
+            <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
+              <p className="text-sm font-semibold text-slate-700">Summary</p>
+              <p className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900">
+                You spent {formatZAR(receipt?.spent ?? 0)}
+              </p>
+              <p className="mt-1 text-sm font-semibold text-slate-600">
+                Your new balance is <span className="text-slate-900">{formatZAR(receipt?.newBalance ?? 0)}</span>
+              </p>
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between rounded-2xl bg-white p-4 ring-1 ring-slate-100">
+              <div className="flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-emerald-700" />
+                <span className="text-sm font-semibold text-slate-700">Balance</span>
+              </div>
+              <span className="text-sm font-extrabold text-slate-900">{formatZAR(receipt?.newBalance ?? 0)}</span>
+            </div>
+            <Button onClick={() => setShowReceipt(false)} className="w-full rounded-full bg-slate-900 hover:bg-slate-800">
+              Done
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <main className="container mx-auto px-4 py-8">
         <div className="mb-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
@@ -445,9 +528,7 @@ export default function LiveWalk() {
               <p className="mt-1 text-sm font-medium text-slate-600">Real-time pack location updates.</p>
             </div>
             {timerLabel && (
-              <Badge className="rounded-full bg-violet-100 text-violet-900 hover:bg-violet-100">
-                Live Timer: {timerLabel}
-              </Badge>
+              <Badge className="rounded-full bg-violet-100 text-violet-900 hover:bg-violet-100">Live Timer: {timerLabel}</Badge>
             )}
           </div>
         </div>
@@ -472,9 +553,7 @@ export default function LiveWalk() {
                           Last known • Lat {Number(session?.current_lat).toFixed(5)} / Lng {Number(session?.current_lng).toFixed(5)}
                         </span>
                       ) : (
-                        <span>
-                          Waiting for GPS ping… Showing a default map center so the screen isn't blank.
-                        </span>
+                        <span>Waiting for GPS ping… Showing a default map center so the screen isn't blank.</span>
                       )}
                     </CardDescription>
                   </div>
@@ -482,9 +561,7 @@ export default function LiveWalk() {
                     <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
                       {isClient ? 'Client view' : isProvider ? 'Provider view' : 'Live'}
                     </Badge>
-                    <Badge className="rounded-full bg-slate-100 text-slate-900 hover:bg-slate-100">
-                      {hasGpsFix ? 'GPS: live' : 'GPS: pending'}
-                    </Badge>
+                    <Badge className="rounded-full bg-slate-100 text-slate-900 hover:bg-slate-100">{hasGpsFix ? 'GPS: live' : 'GPS: pending'}</Badge>
                     {session?.status && (
                       <Badge className="rounded-full bg-slate-100 text-slate-900 hover:bg-slate-100">{session.status}</Badge>
                     )}
@@ -562,10 +639,25 @@ export default function LiveWalk() {
                     </Button>
 
                     <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-100">
-                      <p className="text-xs font-semibold text-slate-700">
-                        Keep this tab open while walking so clients can follow the pack in real time.
-                      </p>
+                      <p className="text-xs font-semibold text-slate-700">Keep this tab open while walking so clients can follow the pack in real time.</p>
                     </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {isClient && isCompleted && (
+                <Card className="rounded-2xl border-slate-200 bg-white">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Receipt className="h-4 w-4 text-violet-700" />
+                      Receipt
+                    </CardTitle>
+                    <CardDescription>See what you were charged after the walk ends.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button onClick={showClientReceipt} className="w-full rounded-full bg-violet-700 hover:bg-violet-800">
+                      View receipt
+                    </Button>
                   </CardContent>
                 </Card>
               )}
@@ -609,11 +701,7 @@ export default function LiveWalk() {
                     </div>
 
                     <div className="flex flex-col gap-3 sm:flex-row">
-                      <Button
-                        onClick={saveSummary}
-                        disabled={savingSummary}
-                        className="flex-1 rounded-full bg-violet-700 hover:bg-violet-800"
-                      >
+                      <Button onClick={saveSummary} disabled={savingSummary} className="flex-1 rounded-full bg-violet-700 hover:bg-violet-800">
                         {savingSummary ? 'Saving…' : 'Send Summary'}
                       </Button>
                       <Button
