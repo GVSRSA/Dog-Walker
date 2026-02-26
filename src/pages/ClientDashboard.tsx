@@ -39,30 +39,28 @@ const ClientDashboard = () => {
     navigate('/');
   };
 
-  const handleBookService = () => {
-    if (!selectedProvider || !selectedDog || !selectedDate || !selectedTime) return;
+  const handleRateBooking = (booking: any) => {
+    setRatingBooking(booking);
+    setShowRatingModal(true);
+  };
 
-    const scheduledDate = new Date(`${selectedDate}T${selectedTime}`);
-    const duration = parseInt(selectedDuration);
-    const price = (selectedProvider.hourlyRate * duration) / 60;
-
-    createBooking({
-      clientId: client.id,
-      providerId: selectedProvider.id,
-      dogIds: [selectedDog],
-      scheduledDate,
-      duration,
-      status: 'pending',
-      price,
-      platformCommission: price * 0.2,
-      providerPayout: price * 0.8,
+  const handleRatingSubmit = (rating: number, comment: string) => {
+    if (!ratingBooking) return;
+    
+    useApp().submitReview({
+      bookingId: ratingBooking.id,
+      fromUserId: client.id,
+      toUserId: ratingBooking.providerId,
+      rating,
+      comment,
     });
+    
+    setShowRatingModal(false);
+    setRatingBooking(null);
+  };
 
-    setShowBookingModal(false);
-    setSelectedProvider(null);
-    setSelectedDog('');
-    setSelectedDate('');
-    setSelectedTime('');
+  const handleBookService = () => {
+
   };
 
   const providers = users.filter(u => u.role === 'provider' && u.isApproved && !u.isSuspended).map(u => u as any);
@@ -188,6 +186,42 @@ const ClientDashboard = () => {
           </Card>
         </div>
 
+        {/* Booking History */}
+        {completedBookings.length > 0 && (
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>Booking History</CardTitle>
+              <CardDescription>Your completed walks</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {completedBookings.map((booking) => {
+                  const provider = getProviderProfile(booking.providerId);
+                  return (
+                    <div key={booking.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div>
+                        <p className="font-semibold">{provider?.name}</p>
+                        <p className="text-sm text-gray-600">
+                          {new Date(booking.scheduledDate).toLocaleDateString()} at {new Date(booking.scheduledDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        </p>
+                        <p className="text-sm text-gray-600">{booking.duration} minutes • R{booking.price.toFixed(2)}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => handleRateBooking(booking)}
+                        className="bg-amber-600 hover:bg-amber-700"
+                      >
+                        <Star className="w-4 h-4 mr-2" />
+                        Rate
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Search Providers */}
         <Card className="mb-8">
           <CardHeader>
@@ -216,7 +250,11 @@ const ClientDashboard = () => {
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <CardTitle className="text-lg">{provider.name}</CardTitle>
-                          <CardDescription>{provider.location?.address}</CardDescription>
+                          <CardDescription>
+                            {provider.neighborhood && <span className="text-green-700 font-medium">{provider.neighborhood}</span>}
+                            {provider.neighborhood && provider.location?.address && ' • '}
+                            {provider.location?.address}
+                          </CardDescription>
                         </div>
                         {distance && (
                           <Badge variant="outline" className="ml-2">
@@ -414,6 +452,18 @@ const ClientDashboard = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Rating Modal */}
+      <RatingModal
+        isOpen={showRatingModal}
+        onClose={() => {
+          setShowRatingModal(false);
+          setRatingBooking(null);
+        }}
+        onSubmit={handleRatingSubmit}
+        userName={ratingBooking ? getProviderProfile(ratingBooking.providerId)?.name || '' : ''}
+        isProvider={true}
+      />
     </div>
   );
 };

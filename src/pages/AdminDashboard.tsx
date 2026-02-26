@@ -8,14 +8,14 @@ import { useApp } from '@/contexts/AppContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   DollarSign, Users, ShoppingCart, TrendingUp, 
-  CheckCircle, XCircle, LogOut, Shield, User
+  CheckCircle, XCircle, LogOut, Shield, User, Star
 } from 'lucide-react';
 
 const AdminDashboard = () => {
-  const { users, bookings, transactions, platformRevenue, approveUser, suspendUser, currentUser } = useApp();
+  const { users, bookings, transactions, platformRevenue, approveUser, suspendUser, currentUser, getAverageRating, getReviews } = useApp();
   const { logout } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'bookings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'bookings' | 'safety'>('overview');
 
   const handleLogout = () => {
     logout();
@@ -84,6 +84,13 @@ const AdminDashboard = () => {
             className={activeTab === 'bookings' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
           >
             Bookings
+          </Button>
+          <Button
+            variant={activeTab === 'safety' ? 'default' : 'outline'}
+            onClick={() => setActiveTab('safety')}
+            className={activeTab === 'safety' ? 'bg-green-700 hover:bg-green-800' : 'text-green-700 border-green-300 hover:bg-green-50'}
+          >
+            Safety
           </Button>
         </div>
 
@@ -289,6 +296,143 @@ const AdminDashboard = () => {
                   })}
                 </TableBody>
               </Table>
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === 'safety' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Safety Dashboard</CardTitle>
+              <CardDescription>Monitor users with low ratings and take action</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Low Rated Users Alert */}
+                {users.filter(u => {
+                  const avgRating = getAverageRating(u.id);
+                  return avgRating > 0 && avgRating < 3.0 && u.role !== 'admin';
+                }).length > 0 && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-red-700">
+                      <Shield className="w-5 h-5" />
+                      <span className="font-semibold">
+                        {users.filter(u => {
+                          const avgRating = getAverageRating(u.id);
+                          return avgRating > 0 && avgRating < 3.0 && u.role !== 'admin';
+                        }).length} user(s) flagged for low ratings
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Low Rated Providers */}
+                <div>
+                  <h3 className="font-semibold mb-4">Providers with Rating Below 3.0</h3>
+                  <div className="space-y-3">
+                    {users.filter(u => {
+                      const avgRating = getAverageRating(u.id);
+                      return avgRating > 0 && avgRating < 3.0 && u.role === 'provider';
+                    }).map((user) => {
+                      const avgRating = getAverageRating(user.id);
+                      const userReviews = getReviews(user.id);
+                      return (
+                        <div key={user.id} className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-lg">
+                          <div>
+                            <p className="font-semibold text-red-900">{user.name}</p>
+                            <p className="text-sm text-gray-600">{user.email}</p>
+                            <p className="text-sm text-gray-600">{user.neighborhood || 'No location set'}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <Star className="w-4 h-4 text-red-500" />
+                              <span className="text-red-700 font-semibold">{avgRating.toFixed(1)} / 5.0</span>
+                              <span className="text-gray-600">({userReviews.length} reviews)</span>
+                            </div>
+                            <div className="mt-2 text-sm text-gray-600">
+                              {userReviews.slice(-2).map(review => (
+                                <p key={review.id} className="italic">"{review.comment}"</p>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            {user.isSuspended ? (
+                              <Badge variant="destructive">Suspended</Badge>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleSuspend(user.id)}
+                              >
+                                <XCircle className="w-4 h-4 mr-2" />
+                                Suspend User
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {users.filter(u => {
+                      const avgRating = getAverageRating(u.id);
+                      return avgRating > 0 && avgRating < 3.0 && u.role === 'provider';
+                    }).length === 0 && (
+                      <p className="text-gray-500 text-center py-8">No providers with low ratings</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Low Rated Clients */}
+                <div>
+                  <h3 className="font-semibold mb-4">Clients with Rating Below 3.0</h3>
+                  <div className="space-y-3">
+                    {users.filter(u => {
+                      const avgRating = getAverageRating(u.id);
+                      return avgRating > 0 && avgRating < 3.0 && u.role === 'client';
+                    }).map((user) => {
+                      const avgRating = getAverageRating(user.id);
+                      const userReviews = getReviews(user.id);
+                      return (
+                        <div key={user.id} className="flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                          <div>
+                            <p className="font-semibold text-amber-900">{user.name}</p>
+                            <p className="text-sm text-gray-600">{user.email}</p>
+                            <p className="text-sm text-gray-600">{user.neighborhood || 'No location set'}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <Star className="w-4 h-4 text-amber-500" />
+                              <span className="text-amber-700 font-semibold">{avgRating.toFixed(1)} / 5.0</span>
+                              <span className="text-gray-600">({userReviews.length} reviews)</span>
+                            </div>
+                            <div className="mt-2 text-sm text-gray-600">
+                              {userReviews.slice(-2).map(review => (
+                                <p key={review.id} className="italic">"{review.comment}"</p>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            {user.isSuspended ? (
+                              <Badge variant="destructive">Suspended</Badge>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleSuspend(user.id)}
+                                className="border-amber-300 text-amber-700 hover:bg-amber-50"
+                              >
+                                <XCircle className="w-4 h-4 mr-2" />
+                                Suspend User
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {users.filter(u => {
+                      const avgRating = getAverageRating(u.id);
+                      return avgRating > 0 && avgRating < 3.0 && u.role === 'client';
+                    }).length === 0 && (
+                      <p className="text-gray-500 text-center py-8">No clients with low ratings</p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
