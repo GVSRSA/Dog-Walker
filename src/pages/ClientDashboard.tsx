@@ -19,7 +19,7 @@ import {
 import { format } from 'date-fns';
 
 const ClientDashboard = () => {
-  const { logout } = useAuth();
+  const { logout, isAdmin } = useAuth();
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const user = currentUser as Profile;
@@ -333,8 +333,8 @@ const ClientDashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {/* Force Admin Dashboard link for ddb@glasseye.co.za */}
-            {currentUser?.email === 'ddb@glasseye.co.za' && (
+            {/* Admin Dashboard link for admins */}
+            {isAdmin && (
               <Link to="/admin" className="text-sm text-green-700 hover:underline font-semibold">
                 Admin Dashboard
               </Link>

@@ -7,6 +7,7 @@ interface AuthContextType {
   currentUser: Profile | null;
   setCurrentUser: (user: Profile | null) => void;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   login: (email: string, password: string) => Promise<Profile | null>;
   register: (email: string, password: string, fullName: string, role: 'client' | 'provider') => Promise<Profile | null>;
   logout: () => void;
@@ -361,6 +362,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     currentUser,
     setCurrentUser,
     isAuthenticated,
+    isAdmin: currentUser?.role === 'admin' || currentUser?.email === 'ddb@glasseye.co.za',
     login,
     register,
     logout,

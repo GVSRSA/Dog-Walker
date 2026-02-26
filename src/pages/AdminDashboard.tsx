@@ -23,11 +23,13 @@ const AdminDashboard = () => {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'bookings' | 'safety'>('users');
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Fetch all profiles
   useEffect(() => {
     const fetchAllProfiles = async () => {
       setLoading(true);
+      setFetchError(null);
       try {
         const { data, error } = await supabase
           .from('profiles')
@@ -36,11 +38,14 @@ const AdminDashboard = () => {
         
         if (error) {
           console.error('Error fetching profiles:', error);
+          setFetchError(`Supabase Error: ${error.message} (Code: ${error.code})`);
         } else {
           setProfiles(data || []);
         }
       } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
         console.error('Error:', err);
+        setFetchError(`Unexpected Error: ${errorMessage}`);
       } finally {
         setLoading(false);
       }
@@ -352,6 +357,18 @@ useEffect(() => {
                 <div className="text-center py-8 text-gray-500">
                   <Dog className="h-6 w-6 animate-spin mx-auto mb-2" />
                   Loading users...
+                </div>
+              ) : fetchError ? (
+                <div className="p-6 bg-red-50 border border-red-200 rounded-lg">
+                  <h3 className="font-semibold text-red-900 mb-2">Error Loading Users</h3>
+                  <p className="text-sm text-red-700 font-mono bg-red-100 p-3 rounded">{fetchError}</p>
+                  <p className="text-xs text-red-600 mt-2">This may be a permission issue. Check your RLS policies.</p>
+                </div>
+              ) : profiles.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Users className="h-10 w-10 mx-auto mb-2 text-gray-400" />
+                  <p className="text-gray-600 mb-2">No users found in the database</p>
+                  <p className="text-xs text-gray-500">This could mean the profiles table is empty or there's a permission issue.</p>
                 </div>
               ) : (
                 <Table>
