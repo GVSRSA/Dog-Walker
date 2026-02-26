@@ -73,32 +73,38 @@ const Register = () => {
     setIsLoading(true);
 
     try {
+      console.log('[Register] Attempting registration for:', email);
       const profile = await register(email, password, fullName, role);
       
       if (profile) {
+        console.log('[Register] Registration successful, navigating to dashboard');
         setRegisteredRole(role);
         setStep('success');
         
-        // Attempt to navigate to appropriate dashboard
-        setTimeout(() => {
-          try {
-            if (role === 'provider') {
-              navigate('/provider');
-            } else {
-              navigate('/client');
-            }
-          } catch (navError) {
-            console.error('Navigation failed:', navError);
-            // User can still use the manual button
+        // Clear loading state immediately and navigate to dashboard
+        setIsLoading(false);
+        
+        // Navigate to appropriate dashboard
+        try {
+          if (role === 'provider') {
+            console.log('[Register] Navigating to provider dashboard');
+            navigate('/provider', { replace: true });
+          } else {
+            console.log('[Register] Navigating to client dashboard');
+            navigate('/client', { replace: true });
           }
-        }, 500);
+        } catch (navError) {
+          console.error('[Register] Navigation failed:', navError);
+          setError('Registration successful but navigation failed. Please use the button below.');
+        }
       } else {
         setError('Registration failed. Please try again.');
+        setIsLoading(false);
       }
     } catch (err: any) {
+      console.error('[Register] Registration error:', err);
       // Show actual Supabase error messages
       setError(err.message || 'Registration failed. Please try again.');
-    } finally {
       setIsLoading(false);
     }
   };

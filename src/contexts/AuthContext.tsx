@@ -112,6 +112,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     role: 'client' | 'provider'
   ): Promise<Profile | null> => {
     try {
+      console.log('[AuthContext] Starting registration for:', email);
+      
       // Sign up with Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -119,16 +121,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
+        console.error('[AuthContext] Supabase auth signup failed:', error);
         throw error;
       }
 
+      console.log('[AuthContext] Supabase auth signup successful:', { userId: data.user?.id });
+
       if (data.user) {
         // Create profile in database with all required fields
-        // Note: created_at, updated_at, credit_balance, avg_rating, review_count, is_suspended are handled automatically by database DEFAULT constraints
+        // IMPORTANT: Using auth.user.id for the profiles table id column
+        console.log('[AuthContext] Creating profile in database with id:', data.user.id);
+        
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .insert({
-            id: data.user.id,
+            id: data.user.id,  // Using auth.user.id
             email,
             full_name: fullName,
             role,
@@ -137,20 +144,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .single();
 
         if (profileError) {
+          console.error('[AuthContext] Profile creation failed:', profileError);
           // Show detailed error message if profile creation fails
           throw new Error(`Profile creation failed: ${profileError.message}`);
         }
 
-        // Set current user state
+        console.log('[AuthContext] Profile created successfully:', { id: profile.id, role: profile.role });
+
+        // Set current user state BEFORE returning
         setCurrentUser(profile);
         setIsAuthenticated(true);
+        
+        console.log('[AuthContext] Registration complete, auth state updated');
         
         return profile;
       }
 
       return null;
     } catch (err) {
-      console.error('Registration error:', err);
+      console.error('[AuthContext] Registration error:', err);
       throw err;
     }
   };
