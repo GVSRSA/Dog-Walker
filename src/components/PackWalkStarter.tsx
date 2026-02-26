@@ -46,6 +46,7 @@ export default function PackWalkStarter({
     return bookings
       .filter((b) => b.provider_id === providerId)
       .filter((b) => b.status === 'confirmed')
+      .filter((b) => !b.walk_session_id)
       .filter((b) => isToday(b.scheduled_date));
   }, [bookings, providerId]);
 
@@ -82,17 +83,18 @@ export default function PackWalkStarter({
 
       const sessionId = session.id as string;
 
-      // Attach selected bookings to that session + flip to in_progress
+      // Attach selected bookings to that session.
+      // IMPORTANT: do NOT try to re-write the booking status here (confirmed is already correct).
       const { error: updateError } = await supabase
         .from('bookings')
-        .update({ status: 'in_progress', walk_session_id: sessionId })
+        .update({ walk_session_id: sessionId })
         .in('id', selectedIds);
 
       if (updateError) throw updateError;
 
       toast({
         title: 'Pack walk started',
-        description: `Created session ${sessionId.slice(0, 8)}… and started ${selectedIds.length} booking(s).`,
+        description: `Created session ${sessionId.slice(0, 8)}… and linked ${selectedIds.length} booking(s).`,
       });
 
       setSelected({});
