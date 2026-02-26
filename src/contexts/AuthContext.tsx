@@ -1,55 +1,200 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useApp } from './AppContext';
+import { useState, useEffect, createContext } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
-interface AuthContextType {
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+interface User {
+  id: string;
+  email: string;
+  password: string;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Database connection
+const supabase = supabase;
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, login: appLogin, logout: appLogout } = useApp();
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Check if user session exists in localStorage
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      try {
-        const user = JSON.parse(savedUser);
-        // Note: We'd normally set the current user here, but since we're using mock data
-        // we'll let the user log in through the form
-      } catch (e) {
-        console.error('Failed to parse saved user');
-      }
+/**
+ * Fetch user from Supabase by email and password
+ */
+const fetchUser = async (email: string, password: string): Promise<User | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .eq('password', password)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching user:', error);
+      return null;
     }
-    setIsLoading(false);
+    
+    return data;
+  } catch (err) {
+    console.error('Error in fetchUser:', err);
+    return null;
+  }
+};
+
+/**
+ * Login user
+ */
+const login = async (email: string, password: string): Promise<User | null> => {
+  try {
+    // Try to fetch user first to verify credentials
+    const user = await fetchUser(email, password);
+    
+    if (!user) {
+      throw new Error('Invalid email or password');
+    }
+
+    const { data } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .update({
+        // Update last_login to now
+        last_login: new Date().toISOString(),
+      });
+    
+    if (error) {
+      console.error('Login failed:', error);
+      throw error;
+    }
+
+    return data;
+  } catch (err) {
+    console.error('Login error:', err);
+    throw err;
+  }
+};
+
+/**
+ * Register new user
+ */
+const register = async (email: string, password: string, role: 'client' | 'provider'): Promise<void> => {
+  try {
+    const { data } = await supabase
+      .from('users')
+      .insert({
+        email,
+        password,
+        role,
+        is_approved: false,
+        is_suspended: false,
+        created_at: new Date().toISOString(),
+      });
+
+    if (error) {
+      console.error('Registration failed:', error);
+      throw error;
+    }
+
+    return data;
+  } catch (err) {
+    console.error('Registration error:', err);
+    throw err;
+  }
+};
+
+/**
+ * Logout user - clears session
+ */
+const logout = async (): Promise<void> => {
+  try {
+    // Try Supabase logout endpoint
+    const { data } = await supabase
+      .post('/auth/v1/logout', {
+        credentials: 'include',
+        mode: 'cors'
+      });
+
+    if (error) {
+      console.error('Logout failed:', error);
+    }
+    
+    return data;
+  } catch (err) {
+    console.error('Logout error:', err);
+    }
+};
+
+// Context Types
+interface AuthContextType {
+  user: User | null;
+  isAuthenticated: boolean;
+  login: (email: string, password: string) => Promise<User | null>;
+  register: (email: string, password: string, role: 'client' | 'provider') => Promise<void>;
+  logout: () => Promise<void>;
+  setCurrentUser: (user: User) => void;
+  setIsAuthenticated: (value: boolean) => void;
+}
+
+// Create Context
+const AuthContext = createContext<AuthContextType>(null);
+
+// Main Provider
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Fetch current user on mount
+  useEffect(() => {
+    const initUser = async () => {
+      const { data: user } = await supabase.auth.getUser();
+      
+      if (data) {
+        setCurrentUser(data);
+        setIsAuthenticated(true);
+      }
+    };
+    
+    initUser();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    await appLogin(email, password);
-    // In a real app, we'd save the session token here
+  // Logout handler
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setCurrentUser(null);
+      setIsAuthenticated(false);
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
   };
 
-  const logout = () => {
-    appLogout();
-    localStorage.removeItem('currentUser');
+  // Login handler
+  const handleLogin = async (email: string, password: string) => {
+    try {
+      const user = await login(email, password);
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+    } catch (err) {
+      console.error('Login error:', err);
+    }
+  };
+
+  // Register handler
+  const handleRegister = async (email: string, password: string, role: 'client' | 'provider') => {
+    try {
+      await register(email, password, role);
+    } catch (err) {
+      console.error('Registration error:', err);
+    }
+  };
+
+  const value = {
+    currentUser,
+    setCurrentUser,
+    isAuthenticated,
+    login: handleLogin,
+    register: handleRegister,
+    logout,
+    setCurrentUser,
+    isAuthenticated,
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated: !!currentUser, isLoading, login, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-  return context;
 };
