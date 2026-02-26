@@ -66,12 +66,12 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-emerald-50/60 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md rounded-2xl border-emerald-100 shadow-sm">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <Card className="w-full max-w-md rounded-2xl border-border shadow-sm">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center">
-              <Dog className="w-8 h-8 text-emerald-800" />
+            <div className="w-16 h-16 bg-secondary rounded-2xl flex items-center justify-center ring-1 ring-border">
+              <Dog className="w-8 h-8 text-primary" />
             </div>
           </div>
           <CardTitle className="text-2xl tracking-tight">Welcome Back</CardTitle>
@@ -80,11 +80,11 @@ const Login = () => {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+              <div className="bg-destructive/10 border border-destructive/25 text-destructive px-4 py-3 rounded-xl text-sm">
                 {error}
               </div>
             )}
-            <div className="space-y-2">
+            <div className="space-y-2 text-left">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
@@ -98,7 +98,7 @@ const Login = () => {
                 className="rounded-xl"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 text-left">
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
@@ -114,7 +114,7 @@ const Login = () => {
             </div>
             <Button
               type="submit"
-              className="w-full rounded-xl bg-emerald-700 hover:bg-emerald-800"
+              className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
               disabled={isLoading}
             >
               {isLoading ? 'Signing in…' : 'Sign In'}
@@ -122,8 +122,8 @@ const Login = () => {
           </form>
 
           <div className="mt-6 text-center text-sm">
-            <span className="text-slate-600">New here? </span>
-            <Link to="/register" className="text-emerald-800 hover:underline font-semibold">
+            <span className="text-muted-foreground">New here? </span>
+            <Link to="/register" className="text-primary hover:underline font-semibold">
               Create an account
             </Link>
           </div>

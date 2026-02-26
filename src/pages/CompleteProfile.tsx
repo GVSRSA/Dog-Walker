@@ -29,8 +29,11 @@ const CompleteProfile = () => {
 
     try {
       // Get current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
       if (userError || !user) {
         throw new Error('Not authenticated');
       }
@@ -46,7 +49,9 @@ const CompleteProfile = () => {
           full_name: fullName,
           role,
         })
-        .select('id, email, role, full_name, created_at, is_approved, is_suspended, avatar_url, phone, location, neighborhood, bio, credit_balance, avg_rating, review_count, is_verified, rating, updated_at')
+        .select(
+          'id, email, role, full_name, created_at, is_approved, is_suspended, avatar_url, phone, location, neighborhood, bio, credit_balance, avg_rating, review_count, is_verified, rating, updated_at'
+        )
         .single();
 
       if (profileError) {
@@ -73,15 +78,15 @@ const CompleteProfile = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <Card className="w-full max-w-md rounded-2xl border-border shadow-sm">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center">
-              <UserPlus className="w-8 h-8 text-white" />
+            <div className="w-16 h-16 bg-secondary rounded-2xl flex items-center justify-center ring-1 ring-border">
+              <UserPlus className="w-8 h-8 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl">Complete Your Profile</CardTitle>
+          <CardTitle className="text-2xl tracking-tight">Complete Your Profile</CardTitle>
           <CardDescription>
             We found your account, but you need to complete your profile to continue
           </CardDescription>
@@ -89,7 +94,7 @@ const CompleteProfile = () => {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
+              <div className="bg-destructive/10 border border-destructive/25 text-destructive px-4 py-3 rounded-xl text-sm">
                 {error}
               </div>
             )}
@@ -101,7 +106,11 @@ const CompleteProfile = () => {
                   type="button"
                   variant={role === 'client' ? 'default' : 'outline'}
                   onClick={() => setRole('client')}
-                  className={role === 'client' ? 'bg-blue-700 hover:bg-blue-800' : ''}
+                  className={
+                    role === 'client'
+                      ? 'rounded-xl bg-accent text-accent-foreground hover:bg-accent/90'
+                      : 'rounded-xl'
+                  }
                 >
                   Pet Parent
                 </Button>
@@ -109,7 +118,11 @@ const CompleteProfile = () => {
                   type="button"
                   variant={role === 'provider' ? 'default' : 'outline'}
                   onClick={() => setRole('provider')}
-                  className={role === 'provider' ? 'bg-green-700 hover:bg-green-800' : ''}
+                  className={
+                    role === 'provider'
+                      ? 'rounded-xl bg-primary text-primary-foreground hover:bg-primary/90'
+                      : 'rounded-xl'
+                  }
                 >
                   Jolly Walker
                 </Button>
@@ -125,12 +138,17 @@ const CompleteProfile = () => {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
+                className="rounded-xl"
               />
             </div>
 
-            <Button 
-              type="submit" 
-              className={`w-full ${role === 'client' ? 'bg-blue-700 hover:bg-blue-800' : 'bg-green-700 hover:bg-green-800'}`}
+            <Button
+              type="submit"
+              className={`w-full rounded-xl ${
+                role === 'client'
+                  ? 'bg-accent text-accent-foreground hover:bg-accent/90'
+                  : 'bg-primary text-primary-foreground hover:bg-primary/90'
+              }`}
               disabled={isLoading}
             >
               {isLoading ? 'Creating Profile...' : 'Complete Profile'}
@@ -144,7 +162,7 @@ const CompleteProfile = () => {
                 supabase.auth.signOut();
                 navigate('/', { replace: true });
               }}
-              className="text-gray-600 hover:text-gray-900"
+              className="text-muted-foreground hover:text-foreground"
             >
               Sign out and try again
             </button>
