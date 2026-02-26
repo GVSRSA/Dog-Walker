@@ -191,6 +191,12 @@ useEffect(() => {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <Link to="/provider" className="text-sm text-green-700 hover:underline">
+              Provider Dashboard
+            </Link>
+            <Link to="/client" className="text-sm text-green-700 hover:underline">
+              Client Dashboard
+            </Link>
             <Link to="/profile">
               <Button variant="ghost" size="icon">
                 <User className="w-4 h-4" />

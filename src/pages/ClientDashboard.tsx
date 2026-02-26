@@ -333,6 +333,15 @@ const ClientDashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {/* Force Admin Dashboard link for ddb@glasseye.co.za */}
+            {currentUser?.email === 'ddb@glasseye.co.za' && (
+              <Link to="/admin" className="text-sm text-green-700 hover:underline font-semibold">
+                Admin Dashboard
+              </Link>
+            )}
+            <Link to="/provider" className="text-sm text-green-700 hover:underline">
+              Provider Dashboard
+            </Link>
             <Link to="/profile">
               <Button variant="ghost" size="icon">
                 <User className="w-4 h-4" />

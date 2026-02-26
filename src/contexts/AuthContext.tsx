@@ -140,7 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('[AuthContext] Starting login for:', email);
       
-      // Sign in with Supabase Auth
+      // STEP 1: Sign in with Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -154,7 +154,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('[AuthContext] Auth successful for user:', data.user?.id);
 
       if (data.user) {
-        // Fetch profile from database - using select(*) for simplicity
+        // STEP 2: Fetch profile from database - using select(*) for simplicity
         try {
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
@@ -165,13 +165,74 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (profileError) {
             console.error('[AuthContext] Profile fetch failed:', profileError);
             
-            // Provide more descriptive error messages
+            // NO ERROR - If profile is missing, create a blank one
             if (profileError.code === 'PGRST116') {
-              throw new Error('Profile not found. Please complete your profile setup.');
+              console.log('[AuthContext] Profile not found, creating blank profile');
+              
+              const { data: newProfile, error: createError } = await supabase
+                .from('profiles')
+                .insert({
+                  id: data.user.id,
+                  email: data.user.email || email,
+                  full_name: '',
+                  role: 'client',
+                  is_approved: false,
+                  is_suspended: false,
+                })
+                .select('*')
+                .single();
+              
+              if (createError) {
+                console.error('[AuthContext] Failed to create blank profile:', createError);
+                // STILL let them in - don't throw error
+                const blankProfile = transformProfile({
+                  id: data.user.id,
+                  email: data.user.email || email,
+                  full_name: '',
+                  role: 'client',
+                  is_approved: false,
+                  is_suspended: false,
+                });
+                setCurrentUser(blankProfile);
+                setIsAuthenticated(true);
+                setNeedsProfileCompletion(true);
+                return blankProfile;
+              }
+              
+              console.log('[AuthContext] Blank profile created:', newProfile);
+              const transformedProfile = transformProfile(newProfile);
+              setCurrentUser(transformedProfile);
+              setIsAuthenticated(true);
+              setNeedsProfileCompletion(true);
+              return transformedProfile;
             } else if (profileError.code === '42P01') {
-              throw new Error('System error: Profiles table not found. Please contact support.');
+              // Table does not exist - STILL let them in with minimal profile
+              console.error('[AuthContext] Profiles table does not exist, creating minimal profile');
+              const minimalProfile = transformProfile({
+                id: data.user.id,
+                email: data.user.email || email,
+                full_name: '',
+                role: 'client',
+                is_approved: false,
+                is_suspended: false,
+              });
+              setCurrentUser(minimalProfile);
+              setIsAuthenticated(true);
+              return minimalProfile;
             } else {
-              throw new Error(`Unable to load profile: ${profileError.message}`);
+              // Other errors - STILL let them in with minimal profile, don't throw
+              console.error('[AuthContext] Other profile error, letting user in with minimal profile:', profileError);
+              const minimalProfile = transformProfile({
+                id: data.user.id,
+                email: data.user.email || email,
+                full_name: '',
+                role: 'client',
+                is_approved: false,
+                is_suspended: false,
+              });
+              setCurrentUser(minimalProfile);
+              setIsAuthenticated(true);
+              return minimalProfile;
             }
           }
           
@@ -189,8 +250,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return transformedProfile;
           }
         } catch (err) {
-          console.error('[AuthContext] Unexpected error in login:', err);
-          throw err;
+          console.error('[AuthContext] Unexpected error in login, STILL letting user in:', err);
+          // STILL let them in - don't throw error
+          const minimalProfile = transformProfile({
+            id: data.user.id,
+            email: data.user.email || email,
+            full_name: '',
+            role: 'client',
+            is_approved: false,
+            is_suspended: false,
+          });
+          setCurrentUser(minimalProfile);
+          setIsAuthenticated(true);
+          return minimalProfile;
         }
       }
 
