@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 const ProviderDashboard = () => {
-  const { bookings, startWalk, endWalk, users, purchaseCredits, currentUser, updateBookingStatus, routes, confirmBooking } = useApp();
+  const { bookings, startWalk, endWalk, users, purchaseCredits, currentUser, updateBookingStatus, routes, confirmBooking, submitReview } = useApp();
   const { logout } = useAuth();
   const navigate = useNavigate();
   const [activeBooking, setActiveBooking] = useState<string | null>(null);
@@ -25,12 +25,34 @@ const ProviderDashboard = () => {
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [creditAmount, setCreditAmount] = useState(10);
   const [watchId, setWatchId] = useState<number | null>(null);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [ratingBooking, setRatingBooking] = useState<any>(null);
 
   const provider = currentUser as any;
 
   const handleLogout = () => {
     logout();
     navigate('/');
+  };
+
+  const handleRateBooking = (booking: any) => {
+    setRatingBooking(booking);
+    setShowRatingModal(true);
+  };
+
+  const handleRatingSubmit = (rating: number, comment: string) => {
+    if (!ratingBooking) return;
+    
+    submitReview({
+      bookingId: ratingBooking.id,
+      fromUserId: provider.id,
+      toUserId: ratingBooking.clientId,
+      rating,
+      comment,
+    });
+    
+    setShowRatingModal(false);
+    setRatingBooking(null);
   };
 
   const handleConfirmBooking = async (bookingId: string) => {
@@ -338,6 +360,7 @@ const ProviderDashboard = () => {
                       <TableHead>Duration</TableHead>
                       <TableHead>Earnings</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -355,6 +378,18 @@ const ProviderDashboard = () => {
                             }>
                               {booking.status}
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {booking.status === 'completed' && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleRateBooking(booking)}
+                                className="bg-amber-600 hover:bg-amber-700"
+                              >
+                                <Star className="w-4 h-4 mr-2" />
+                                Rate Client
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       );
@@ -486,6 +521,18 @@ const ProviderDashboard = () => {
           </Card>
         </div>
       )}
+
+      {/* Rating Modal */}
+      <RatingModal
+        isOpen={showRatingModal}
+        onClose={() => {
+          setShowRatingModal(false);
+          setRatingBooking(null);
+        }}
+        onSubmit={handleRatingSubmit}
+        userName={ratingBooking ? users.find(u => u.id === ratingBooking.clientId)?.name || '' : ''}
+        isProvider={false}
+      />
     </div>
   );
 };

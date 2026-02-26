@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 const ClientDashboard = () => {
-  const { bookings, users, createBooking, currentUser, routes, getProviderProfile } = useApp();
+  const { bookings, users, createBooking, currentUser, routes, getProviderProfile, submitReview } = useApp();
   const { logout } = useAuth();
   const navigate = useNavigate();
   
@@ -47,7 +47,7 @@ const ClientDashboard = () => {
   const handleRatingSubmit = (rating: number, comment: string) => {
     if (!ratingBooking) return;
     
-    useApp().submitReview({
+    submitReview({
       bookingId: ratingBooking.id,
       fromUserId: client.id,
       toUserId: ratingBooking.providerId,
