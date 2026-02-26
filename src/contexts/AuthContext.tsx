@@ -9,6 +9,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<Profile | null>;
   register: (email: string, password: string, fullName: string, role: 'client' | 'provider') => Promise<Profile | null>;
   logout: () => void;
+  clearStaleSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,6 +25,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (error) {
         console.error('[AuthContext] Error getting user:', error);
+        
+        // If the user from the JWT doesn't exist (stale session from deleted user), clear it
+        if (error.message?.includes('does not exist') || error.name === 'AuthApiError') {
+          console.log('[AuthContext] Clearing stale session...');
+          await supabase.auth.signOut();
+        }
         return;
       }
       
@@ -144,6 +151,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthenticated(false);
   };
 
+  const clearStaleSession = async () => {
+    console.log('[AuthContext] Manually clearing session...');
+    await supabase.auth.signOut();
+    setCurrentUser(null);
+    setIsAuthenticated(false);
+  };
+
   const value = {
     currentUser,
     setCurrentUser,
@@ -151,6 +165,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     login,
     register,
     logout,
+    clearStaleSession,
   };
 
   return (
