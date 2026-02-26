@@ -1,4 +1,5 @@
 import React, { createContext, useContext } from 'react';
+import type { Profile } from '@/types';
 
 // Simple context for sharing minimal state between components
 interface AppContextType {

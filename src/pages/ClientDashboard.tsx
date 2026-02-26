@@ -309,7 +309,7 @@ const ClientDashboard = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">My Dogs</CardTitle>
-              <Dog className="h-4 w-4 text-blue-700" />
+              <DogIcon className="h-4 w-4 text-blue-700" />
             </CardHeader>
             <CardContent>
               {loadingDogs ? (
@@ -511,7 +511,7 @@ const ClientDashboard = () => {
                           </div>
                           <div className="flex items-center space-x-4 mt-4">
                             <div className="flex items-center space-x-1">
-                              <Star className="w-4 h-4 text-yellow-500 fill="current" />
+                              <Star className="w-4 h-4 text-yellow-500 fill-current" />
                               <span className="font-semibold">{provider.avg_rating || 'N/A'}</span>
                               <span className="text-sm text-gray-600">({provider.review_count || 0} reviews)</span>
                             </div>
@@ -681,7 +681,8 @@ const ClientDashboard = () => {
             setRatingBooking(null);
           }}
           onSubmit={handleRatingSubmit}
-          providerId={ratingBooking.provider_id}
+          userName={`Provider ${ratingBooking.provider_id?.slice(0, 8)}...`}
+          isProvider={true}
         />
       )}
 

@@ -6,8 +6,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import {
-  DollarSign, Users, ShoppingCart, TrendingUp,
+import type { Profile, Booking, Review } from '@/types';
+import { 
+  DollarSign, Users, ShoppingCart, TrendingUp, 
   CheckCircle, XCircle, LogOut, Shield, User, Star, Dog
 } from 'lucide-react';
 import { format } from 'date-fns';

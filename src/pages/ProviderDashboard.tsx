@@ -358,7 +358,7 @@ const ProviderDashboard = () => {
               <CardContent>
                 {loadingBookings ? (
                   <div className="text-center py-8 text-gray-500">
-                    <Dog className="h-6 w-6 animate-spin mx-auto mb-2" />
+                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-green-700 border-t-transparent mx-auto mb-2"></div>
                     Loading bookings...
                   </div>
                 ) : pendingBookings.length === 0 ? (
@@ -466,7 +466,7 @@ const ProviderDashboard = () => {
               <CardContent>
                 {loadingBookings ? (
                   <div className="text-center py-8 text-gray-500">
-                    <Dogs className="h-6 w-6 animate-spin mx-auto mb-2" />
+                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-green-700 border-t-transparent mx-auto mb-2"></div>
                     Loading bookings...
                   </div>
                 ) : completedBookings.length === 0 && bookings.filter(b => b.status === 'cancelled').length === 0 ? (
@@ -648,7 +648,8 @@ const ProviderDashboard = () => {
           setRatingBooking(null);
         }}
         onSubmit={handleRatingSubmit}
-        providerId={ratingBooking?.provider_id || ''}
+        userName={`Client ${ratingBooking?.client_id?.slice(0, 8)}...`}
+        isProvider={false}
       />
     </div>
   );
