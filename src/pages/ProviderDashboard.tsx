@@ -13,6 +13,7 @@ import { RatingModal } from '@/components/RatingModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchBookings } from '@/utils/supabase/helpers';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 import type { Profile, Booking } from '@/types';
 import {
   MapPin,
@@ -42,6 +43,7 @@ const ProviderDashboard = () => {
 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
   const [isWalking, setIsWalking] = useState(false);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
@@ -61,7 +63,7 @@ const ProviderDashboard = () => {
     if (!currentUser?.id) return;
     const { data, error } = await fetchBookings(currentUser.id, 'provider');
     if (error) {
-      console.error('Error fetching bookings:', error);
+      console.error('[provider-dashboard] Error fetching bookings:', error);
       return;
     }
     setBookings(data || []);
@@ -76,7 +78,7 @@ const ProviderDashboard = () => {
       try {
         await refreshBookings();
       } catch (err) {
-        console.error('Error:', err);
+        console.error('[provider-dashboard] Error:', err);
       } finally {
         setLoadingBookings(false);
       }
@@ -104,32 +106,57 @@ const ProviderDashboard = () => {
       });
 
       if (error) {
-        console.error('Error submitting review:', error);
-        alert('Failed to submit review');
+        console.error('[provider-dashboard] Error submitting review:', error);
+        toast({ title: 'Could not submit review', description: error.message, variant: 'destructive' });
       } else {
         setShowRatingModal(false);
         setRatingBooking(null);
-        alert('Review submitted successfully!');
+        toast({ title: 'Review submitted', description: 'Thanks for the feedback.' });
       }
-    } catch (err) {
-      console.error('Error:', err);
-      alert('Failed to submit review');
+    } catch (err: any) {
+      console.error('[provider-dashboard] Error:', err);
+      toast({ title: 'Could not submit review', description: err?.message || 'Please try again.', variant: 'destructive' });
     }
   };
 
   const handleConfirmBooking = async (bookingId: string) => {
+    console.log('[provider-dashboard] Confirm booking clicked', { bookingId });
+    setConfirmingId(bookingId);
+
+    // Optimistic UI update so it moves immediately
+    setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: 'confirmed' } : b)));
+
     try {
-      const { error } = await supabase.from('bookings').update({ status: 'confirmed' }).eq('id', bookingId);
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: 'confirmed' })
+        .eq('id', bookingId);
 
       if (error) {
-        console.error('Error confirming booking:', error);
-        alert('Failed to confirm booking');
-      } else {
+        console.error('[provider-dashboard] Confirm booking failed:', error);
+        toast({
+          title: 'Could not confirm booking',
+          description: error.message,
+          variant: 'destructive',
+        });
+
+        // Rollback optimistic change
         await refreshBookings();
+        return;
       }
-    } catch (err) {
-      console.error('Error:', err);
-      alert('Failed to confirm booking');
+
+      toast({ title: 'Booking confirmed', description: 'It\'s now in your Daily Schedule.' });
+      await refreshBookings();
+    } catch (err: any) {
+      console.error('[provider-dashboard] Confirm booking exception:', err);
+      toast({
+        title: 'Could not confirm booking',
+        description: err?.message || 'Please try again.',
+        variant: 'destructive',
+      });
+      await refreshBookings();
+    } finally {
+      setConfirmingId(null);
     }
   };
 
@@ -387,10 +414,10 @@ const ProviderDashboard = () => {
                           <Button
                             size="sm"
                             onClick={() => handleConfirmBooking(booking.id)}
-                            disabled={isWalking}
+                            disabled={isWalking || confirmingId === booking.id}
                             className="bg-green-700 hover:bg-green-800"
                           >
-                            Confirm Booking
+                            {confirmingId === booking.id ? 'Confirming…' : 'Confirm Booking'}
                           </Button>
                         </div>
                       </div>
