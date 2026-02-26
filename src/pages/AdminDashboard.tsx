@@ -145,22 +145,23 @@ useEffect(() => {
     }
   };
 
-  const handleSuspend = async (userId: string) => {
+  const handleSetSuspended = async (userId: string, suspensionStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ is_suspended: true })
-        .eq('id', userId);
+      const { error } = await supabase.rpc('toggle_user_suspension', {
+        target_id: userId,
+        suspension_status: suspensionStatus,
+      });
 
       if (error) {
-        console.error('Error suspending user:', error);
-        alert('Failed to suspend user');
-      } else {
-        await fetchUsers();
+        console.error('Error toggling user suspension:', error);
+        alert(`Failed to ${suspensionStatus ? 'suspend' : 'unsuspend'} user`);
+        return;
       }
+
+      await fetchUsers();
     } catch (err) {
       console.error('Error:', err);
-      alert('Failed to suspend user');
+      alert(`Failed to ${suspensionStatus ? 'suspend' : 'unsuspend'} user`);
     }
   };
 
@@ -416,7 +417,10 @@ useEffect(() => {
                   </TableHeader>
                   <TableBody>
                     {profiles.map((profile) => (
-                      <TableRow key={profile.id}>
+                      <TableRow
+                        key={profile.id}
+                        className={profile.is_suspended ? 'bg-slate-50 text-slate-500' : undefined}
+                      >
                         <TableCell className="font-medium">{profile.full_name}</TableCell>
                         <TableCell>{profile.email}</TableCell>
                         <TableCell>
@@ -438,7 +442,7 @@ useEffect(() => {
                               {profile.is_approved ? 'Approved' : 'Pending'}
                             </Badge>
                             {profile.is_suspended && (
-                              <Badge variant="destructive">Suspended</Badge>
+                              <Badge className="bg-slate-200 text-slate-900 border border-slate-300 hover:bg-slate-200">Suspended</Badge>
                             )}
                           </div>
                         </TableCell>
@@ -453,15 +457,27 @@ useEffect(() => {
                                 Approve
                               </Button>
                             )}
-                            {profile.is_approved && !profile.is_suspended && profile.role !== 'admin' && (
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => handleSuspend(profile.id)}
-                              >
-                                Suspend
-                              </Button>
+
+                            {profile.role !== 'admin' && (profile.is_approved || profile.is_suspended) && (
+                              profile.is_suspended ? (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleSetSuspended(profile.id, false)}
+                                  className="bg-emerald-600 text-white hover:bg-emerald-700"
+                                >
+                                  Unsuspend
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => handleSetSuspended(profile.id, true)}
+                                >
+                                  Suspend
+                                </Button>
+                              )
                             )}
+
                             {profile.role !== 'admin' && (
                               <Button
                                 size="sm"
@@ -641,12 +657,18 @@ useEffect(() => {
                             </div>
                             <div className="flex gap-2">
                               {user.is_suspended ? (
-                                <Badge variant="destructive">Suspended</Badge>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleSetSuspended(user.id, false)}
+                                  className="bg-emerald-600 text-white hover:bg-emerald-700"
+                                >
+                                  Unsuspend
+                                </Button>
                               ) : (
                                 <Button
                                   size="sm"
                                   variant="destructive"
-                                  onClick={() => handleSuspend(user.id)}
+                                  onClick={() => handleSetSuspended(user.id, true)}
                                 >
                                   <XCircle className="w-4 h-4 mr-2" />
                                   Suspend User
@@ -695,12 +717,18 @@ useEffect(() => {
                             </div>
                             <div className="flex gap-2">
                               {user.is_suspended ? (
-                                <Badge variant="destructive">Suspended</Badge>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleSetSuspended(user.id, false)}
+                                  className="bg-emerald-600 text-white hover:bg-emerald-700"
+                                >
+                                  Unsuspend
+                                </Button>
                               ) : (
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => handleSuspend(user.id)}
+                                  onClick={() => handleSetSuspended(user.id, true)}
                                   className="border-amber-300 text-amber-700 hover:bg-amber-50"
                                 >
                                   <XCircle className="w-4 h-4 mr-2" />
