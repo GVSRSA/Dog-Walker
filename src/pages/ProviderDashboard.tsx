@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 const ProviderDashboard = () => {
-  const { bookings, startWalk, endWalk, users, purchaseCredits, currentUser, updateBookingStatus, routes } = useApp();
+  const { bookings, startWalk, endWalk, users, purchaseCredits, currentUser, updateBookingStatus, routes, confirmBooking } = useApp();
   const { logout } = useAuth();
   const navigate = useNavigate();
   const [activeBooking, setActiveBooking] = useState<string | null>(null);
@@ -28,6 +28,14 @@ const ProviderDashboard = () => {
   const handleLogout = () => {
     logout();
     navigate('/');
+  };
+
+  const handleConfirmBooking = async (bookingId: string) => {
+    try {
+      await confirmBooking(bookingId);
+    } catch (error) {
+      console.error('Failed to confirm booking:', error);
+    }
   };
 
   const handleStartWalk = async (bookingId: string) => {
@@ -75,6 +83,7 @@ const ProviderDashboard = () => {
 
   const myBookings = bookings.filter(b => b.providerId === provider?.id);
   const pendingBookings = myBookings.filter(b => b.status === 'pending');
+  const confirmedBookings = myBookings.filter(b => b.status === 'confirmed');
   const activeBookings = myBookings.filter(b => b.status === 'active');
   const completedBookings = myBookings.filter(b => b.status === 'completed');
 
@@ -185,12 +194,11 @@ const ProviderDashboard = () => {
                             <p className="font-bold text-green-700">${booking.price.toFixed(2)}</p>
                             <Button
                               size="sm"
-                              onClick={() => handleStartWalk(booking.id)}
+                              onClick={() => handleConfirmBooking(booking.id)}
                               disabled={isWalking}
                               className="bg-green-700 hover:bg-green-800"
                             >
-                              <Play className="w-4 h-4 mr-1" />
-                              Accept & Start
+                              Confirm Booking
                             </Button>
                           </div>
                         </div>
@@ -200,6 +208,45 @@ const ProviderDashboard = () => {
                 )}
               </CardContent>
             </Card>
+
+            {confirmedBookings.length > 0 && (
+              <Card className="border-green-300 bg-green-50">
+                <CardHeader>
+                  <CardTitle className="text-green-900">Confirmed Bookings</CardTitle>
+                  <CardDescription>Ready to start walks</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {confirmedBookings.map((booking) => {
+                      const client = users.find(u => u.id === booking.clientId);
+                      return (
+                        <div key={booking.id} className="flex items-center justify-between p-4 bg-white rounded-lg">
+                          <div>
+                            <p className="font-semibold">{client?.name}</p>
+                            <p className="text-sm text-gray-600">
+                              {new Date(booking.scheduledDate).toLocaleDateString()} at {new Date(booking.scheduledDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </p>
+                            <p className="text-sm text-gray-600">{booking.duration} minutes</p>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <p className="font-bold text-green-700">${booking.price.toFixed(2)}</p>
+                            <Button
+                              size="sm"
+                              onClick={() => handleStartWalk(booking.id)}
+                              disabled={isWalking}
+                              className="bg-green-700 hover:bg-green-800"
+                            >
+                              <Play className="w-4 h-4 mr-1" />
+                              Start Walk
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {activeBookings.length > 0 && (
               <Card className="border-green-300 bg-green-50">
