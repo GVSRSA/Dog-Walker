@@ -109,6 +109,7 @@ interface AppContextType {
   purchaseCredits: (userId: string, amount: number, credits: number) => void;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt'>) => void;
   getProviderProfile: (providerId: string) => ProviderProfile | undefined;
+  updateProfile: (userId: string, updates: Partial<User | ProviderProfile | ClientProfile>) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -451,6 +452,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return users.find(u => u.id === providerId && u.role === 'provider') as ProviderProfile;
   };
 
+  const updateProfile = (userId: string, updates: Partial<User | ProviderProfile | ClientProfile>) => {
+    setUsers(users.map(u => u.id === userId ? { ...u, ...updates } : u));
+    // Also update current user if it's the same user
+    if (currentUser && currentUser.id === userId) {
+      setCurrentUser({ ...currentUser, ...updates });
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -475,6 +484,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         purchaseCredits,
         addTransaction,
         getProviderProfile,
+        updateProfile,
       }}
     >
       {children}

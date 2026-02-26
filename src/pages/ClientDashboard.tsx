@@ -12,7 +12,7 @@ import { useApp } from '@/contexts/AppContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   LogOut, MapPin, Search, Dog, Calendar, 
-  Star, DollarSign, Navigation, Clock 
+  Star, DollarSign, Navigation, Clock, User
 } from 'lucide-react';
 
 const ClientDashboard = () => {
@@ -103,10 +103,17 @@ const ClientDashboard = () => {
               <p className="text-xs text-gray-600">Welcome, {client?.name}</p>
             </div>
           </div>
-          <Button variant="ghost" onClick={handleLogout}>
-            <LogOut className="w-4 h-4 mr-2" />
-            Logout
-          </Button>
+          <div className="flex items-center gap-3">
+            <Link to="/profile">
+              <Button variant="ghost" size="icon">
+                <User className="w-4 h-4" />
+              </Button>
+            </Link>
+            <Button variant="ghost" onClick={handleLogout}>
+              <LogOut className="w-4 h-4 mr-2" />
+              Logout
+            </Button>
+          </div>
         </div>
       </header>
 
