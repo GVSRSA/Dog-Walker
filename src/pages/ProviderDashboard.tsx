@@ -26,6 +26,13 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 
+function isToday(isoDate?: string | null) {
+  if (!isoDate) return false;
+  const today = new Date();
+  const [y, m, d] = isoDate.split('-').map((x) => Number(x));
+  return today.getFullYear() === y && today.getMonth() + 1 === m && today.getDate() === d;
+}
+
 const ProviderDashboard = () => {
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -277,6 +284,7 @@ const ProviderDashboard = () => {
 
   const pendingBookings = bookings.filter((b) => b.status === 'pending');
   const confirmedBookings = bookings.filter((b) => b.status === 'confirmed');
+  const todaysConfirmedBookings = confirmedBookings.filter((b) => isToday(b.scheduled_date));
   const inProgressBookings = bookings.filter((b) => b.status === 'in_progress');
   const activeBookings = bookings.filter((b) => b.status === 'active');
   const completedBookings = bookings.filter((b) => b.status === 'completed');
@@ -349,11 +357,11 @@ const ProviderDashboard = () => {
           <section id="walks" className="scroll-mt-24 lg:col-span-2 space-y-6">
             <PackWalkStarter providerId={currentUser.id} bookings={bookings} onCreated={refreshBookings} />
 
-            {/* Pending Bookings */}
+            {/* New Requests */}
             <Card>
               <CardHeader>
-                <CardTitle>Pending Bookings</CardTitle>
-                <CardDescription>Accept new booking requests</CardDescription>
+                <CardTitle>New Requests</CardTitle>
+                <CardDescription>Confirm bookings to add them to today's schedule.</CardDescription>
               </CardHeader>
               <CardContent>
                 {loadingBookings ? (
@@ -362,7 +370,7 @@ const ProviderDashboard = () => {
                     Loading bookings...
                   </div>
                 ) : pendingBookings.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">No pending bookings</p>
+                  <p className="text-gray-500 text-center py-8">No new requests</p>
                 ) : (
                   <div className="space-y-4">
                     {pendingBookings.map((booking) => (
@@ -382,7 +390,7 @@ const ProviderDashboard = () => {
                             disabled={isWalking}
                             className="bg-green-700 hover:bg-green-800"
                           >
-                            Confirm
+                            Confirm Booking
                           </Button>
                         </div>
                       </div>
@@ -392,16 +400,16 @@ const ProviderDashboard = () => {
               </CardContent>
             </Card>
 
-            {/* Confirmed Bookings */}
-            {confirmedBookings.length > 0 && (
+            {/* Daily Schedule */}
+            {todaysConfirmedBookings.length > 0 && (
               <Card className="border-green-300 bg-green-50">
                 <CardHeader>
-                  <CardTitle className="text-green-900">Confirmed Bookings</CardTitle>
-                  <CardDescription>Ready to start walks</CardDescription>
+                  <CardTitle className="text-green-900">Daily Schedule</CardTitle>
+                  <CardDescription>Today's confirmed bookings (these appear in the Pack Walk selector above).</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {confirmedBookings.map((booking) => (
+                    {todaysConfirmedBookings.map((booking) => (
                       <div key={booking.id} className="flex items-center justify-between p-4 bg-white rounded-lg">
                         <div>
                           <p className="font-semibold">Client ID: {booking.client_id.slice(0, 8)}...</p>
