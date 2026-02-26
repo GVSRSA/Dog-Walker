@@ -25,6 +25,8 @@ export interface ProviderProfile extends BaseUser {
   availableCredits: number;
   totalWalks: number;
   rating: number;
+  avg_rating?: number;
+  review_count?: number;
   bio: string;
   location?: {
     lat: number;

@@ -48,7 +48,9 @@ const Profile = () => {
     services: [] as string[],
     availableCredits: 0,
     rating: 0,
+    avg_rating: 0,
     totalWalks: 0,
+    review_count: 0,
     availability: { days: [] as string[], startTime: '', endTime: '' },
   });
 
@@ -66,7 +68,9 @@ const Profile = () => {
         services: (currentUser as any).services || [],
         availableCredits: (currentUser as any).availableCredits || 0,
         rating: (currentUser as any).rating || 0,
+        avg_rating: (currentUser as any).avg_rating || 0,
         totalWalks: (currentUser as any).totalWalks || 0,
+        review_count: (currentUser as any).review_count || 0,
         availability: (currentUser as any).availability || { days: [], startTime: '09:00', endTime: '18:00' },
       });
     }
@@ -589,11 +593,11 @@ const Profile = () => {
                   <>
                     <div className="flex items-center gap-3 text-sm pt-4 border-t">
                       <Star className="w-4 h-4 text-amber-500" />
-                      <span className="text-gray-600 font-medium">{formData.rating} Rating</span>
+                      <span className="text-gray-600 font-medium">{formData.avg_rating || formData.rating} Rating</span>
                     </div>
                     <div className="flex items-center gap-3 text-sm">
                       <Dog className="w-4 h-4 text-blue-500" />
-                      <span className="text-gray-600">{formData.totalWalks} Walks Completed</span>
+                      <span className="text-gray-600">{formData.review_count || formData.totalWalks} Reviews</span>
                     </div>
                     <div className="flex items-center gap-3 text-sm">
                       <DollarSign className="w-4 h-4 text-green-500" />

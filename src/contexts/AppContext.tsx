@@ -24,6 +24,8 @@ export type ProviderProfile = User & {
   totalWalks?: number;
   availableCredits?: number;
   availability?: { days: string[]; startTime: string; endTime: string };
+  avg_rating?: number;
+  review_count?: number;
 };
 
 export type ClientProfile = User & {
@@ -155,7 +157,9 @@ const mockUsers: (User | ProviderProfile | ClientProfile)[] = [
     services: ['Walking', 'Pet Sitting', 'Training'],
     hourlyRate: 150,
     rating: 4.8,
+    avg_rating: 4.8,
     totalWalks: 156,
+    review_count: 42,
     availableCredits: 10,
     availability: { days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], startTime: '08:00', endTime: '18:00' },
     isApproved: true,
@@ -174,7 +178,9 @@ const mockUsers: (User | ProviderProfile | ClientProfile)[] = [
     services: ['Walking', 'Running with Dogs'],
     hourlyRate: 180,
     rating: 4.9,
+    avg_rating: 4.9,
     totalWalks: 203,
+    review_count: 67,
     availableCredits: 5,
     availability: { days: ['Mon', 'Wed', 'Fri', 'Sat'], startTime: '07:00', endTime: '20:00' },
     isApproved: true,

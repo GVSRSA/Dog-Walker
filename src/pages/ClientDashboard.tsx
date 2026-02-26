@@ -288,8 +288,8 @@ const ClientDashboard = () => {
                       <div className="space-y-2 mb-4">
                         <div className="flex items-center gap-2">
                           <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                          <span className="font-semibold">{provider.rating}</span>
-                          <span className="text-gray-600">({provider.totalWalks} walks)</span>
+                          <span className="font-semibold">{provider.avg_rating || provider.rating}</span>
+                          <span className="text-gray-600">({provider.review_count || provider.totalWalks} reviews)</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                           <DollarSign className="w-4 h-4" />

@@ -204,8 +204,8 @@ const ProviderDashboard = () => {
               <Star className="h-4 w-4 text-amber-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{provider?.rating || 0}</div>
-              <p className="text-xs text-gray-600">{provider?.totalWalks || 0} total walks</p>
+              <div className="text-2xl font-bold">{provider?.avg_rating || provider?.rating || 0}</div>
+              <p className="text-xs text-gray-600">{provider?.review_count || provider?.totalWalks || 0} reviews</p>
             </CardContent>
           </Card>
 
