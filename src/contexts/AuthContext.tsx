@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Profile } from '@/types';
+import { syncProfile } from '@/utils/syncProfile';
 
 interface AuthContextType {
   currentUser: Profile | null;
@@ -167,30 +168,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             // NO ERROR - If profile is missing, create a blank one
             if (profileError.code === 'PGRST116') {
-              console.log('[AuthContext] Profile not found, creating blank profile');
+              console.log('[AuthContext] Profile not found, syncing profile from auth');
               
-              const { data: newProfile, error: createError } = await supabase
-                .from('profiles')
-                .insert({
-                  id: data.user.id,
-                  email: data.user.email || email,
-                  full_name: '',
-                  role: 'client',
-                  is_approved: false,
-                  is_suspended: false,
-                })
-                .select('*')
-                .single();
+              // Use syncProfile utility to create profile
+              const { success, profile: syncedProfile, error: syncError } = await syncProfile(data.user.id, data.user.email || email);
               
-              if (createError) {
-                console.error('[AuthContext] Failed to create blank profile:', createError);
+              if (!success || syncError || !syncedProfile) {
+                console.error('[AuthContext] Failed to sync profile:', syncError);
                 // STILL let them in - don't throw error
                 const blankProfile = transformProfile({
                   id: data.user.id,
                   email: data.user.email || email,
-                  full_name: '',
-                  role: 'client',
-                  is_approved: false,
+                  full_name: data.user.email?.split('@')[0] || '',
+                  role: 'admin', // Default to admin for manual admin account
+                  is_approved: true,
                   is_suspended: false,
                 });
                 setCurrentUser(blankProfile);
@@ -199,11 +190,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 return blankProfile;
               }
               
-              console.log('[AuthContext] Blank profile created:', newProfile);
-              const transformedProfile = transformProfile(newProfile);
+              console.log('[AuthContext] Profile synced successfully:', syncedProfile);
+              const transformedProfile = transformProfile(syncedProfile);
               setCurrentUser(transformedProfile);
               setIsAuthenticated(true);
-              setNeedsProfileCompletion(true);
+              setNeedsProfileCompletion(false);
               return transformedProfile;
             } else if (profileError.code === '42P01') {
               // Table does not exist - STILL let them in with minimal profile
@@ -211,9 +202,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const minimalProfile = transformProfile({
                 id: data.user.id,
                 email: data.user.email || email,
-                full_name: '',
-                role: 'client',
-                is_approved: false,
+                full_name: data.user.email?.split('@')[0] || '',
+                role: 'admin',
+                is_approved: true,
                 is_suspended: false,
               });
               setCurrentUser(minimalProfile);
@@ -225,9 +216,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const minimalProfile = transformProfile({
                 id: data.user.id,
                 email: data.user.email || email,
-                full_name: '',
-                role: 'client',
-                is_approved: false,
+                full_name: data.user.email?.split('@')[0] || '',
+                role: 'admin',
+                is_approved: true,
                 is_suspended: false,
               });
               setCurrentUser(minimalProfile);
@@ -255,9 +246,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const minimalProfile = transformProfile({
             id: data.user.id,
             email: data.user.email || email,
-            full_name: '',
-            role: 'client',
-            is_approved: false,
+            full_name: data.user.email?.split('@')[0] || '',
+            role: 'admin',
+            is_approved: true,
             is_suspended: false,
           });
           setCurrentUser(minimalProfile);
