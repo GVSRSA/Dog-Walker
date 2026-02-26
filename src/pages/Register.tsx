@@ -5,9 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { Dog, User, Heart, Briefcase, ArrowRight } from 'lucide-react';
+import { Dog, User, Heart, Briefcase, ArrowRight, CheckCircle2 } from 'lucide-react';
 
-type RegisterStep = 'selection' | 'form';
+type RegisterStep = 'selection' | 'form' | 'success';
 
 const Register = () => {
   const [step, setStep] = useState<RegisterStep>('selection');
@@ -18,6 +18,7 @@ const Register = () => {
   const [role, setRole] = useState<'client' | 'provider'>('client');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [registeredRole, setRegisteredRole] = useState<'client' | 'provider' | null>(null);
   const { register } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -40,6 +41,14 @@ const Register = () => {
 
   const handleBack = () => {
     setStep('selection');
+  };
+
+  const handleGoToDashboard = () => {
+    if (registeredRole === 'provider') {
+      navigate('/provider');
+    } else if (registeredRole === 'client') {
+      navigate('/client');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -67,12 +76,22 @@ const Register = () => {
       const profile = await register(email, password, fullName, role);
       
       if (profile) {
-        // Redirect to appropriate dashboard based on role
-        if (role === 'provider') {
-          navigate('/provider');
-        } else {
-          navigate('/client');
-        }
+        setRegisteredRole(role);
+        setStep('success');
+        
+        // Attempt to navigate to appropriate dashboard
+        setTimeout(() => {
+          try {
+            if (role === 'provider') {
+              navigate('/provider');
+            } else {
+              navigate('/client');
+            }
+          } catch (navError) {
+            console.error('Navigation failed:', navError);
+            // User can still use the manual button
+          }
+        }, 500);
       } else {
         setError('Registration failed. Please try again.');
       }
@@ -216,6 +235,56 @@ const Register = () => {
     </div>
   );
 
+  const renderSuccessStep = () => (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardContent className="p-8 text-center space-y-6">
+          <div className="flex justify-center">
+            <div className={`w-20 h-20 rounded-full flex items-center justify-center ${
+              registeredRole === 'client' 
+                ? 'bg-gradient-to-br from-blue-400 to-blue-600' 
+                : 'bg-gradient-to-br from-green-400 to-green-600'
+            }`}>
+              <CheckCircle2 className="w-10 h-10 text-white" />
+            </div>
+          </div>
+          
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Registration Successful!</h2>
+            <p className="text-gray-600">
+              Your account has been created. You can now access your dashboard.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <Button 
+              onClick={handleGoToDashboard}
+              className={`w-full ${
+                registeredRole === 'client' 
+                  ? 'bg-blue-700 hover:bg-blue-800' 
+                  : 'bg-green-700 hover:bg-green-800'
+              }`}
+              size="lg"
+            >
+              {registeredRole === 'client' ? 'Go to Pet Dashboard' : 'Go to Provider Dashboard'}
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+            
+            <p className="text-xs text-gray-500">
+              If the automatic redirect doesn't work, click the button above.
+            </p>
+          </div>
+
+          <div className="pt-4 border-t">
+            <p className="text-sm text-gray-600">
+              Welcome to the Jolly Walker community, {fullName}! 🐕
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
   const renderFormStep = () => (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
@@ -326,7 +395,13 @@ const Register = () => {
     </div>
   );
 
-  return step === 'selection' ? renderSelectionStep() : renderFormStep();
+  return (
+    <>
+      {step === 'selection' && renderSelectionStep()}
+      {step === 'form' && renderFormStep()}
+      {step === 'success' && renderSuccessStep()}
+    </>
+  );
 };
 
 export default Register;
