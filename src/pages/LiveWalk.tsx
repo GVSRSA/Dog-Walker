@@ -72,7 +72,7 @@ export default function LiveWalk() {
   const [savingSummary, setSavingSummary] = useState(false);
 
   const [showReceipt, setShowReceipt] = useState(false);
-  const [receipt, setReceipt] = useState<{ spent: number; newBalance: number } | null>(null);
+  const [receipt, setReceipt] = useState<{ spent: number; newBalance: number; didPee: boolean; didPoop: boolean } | null>(null);
 
   const watchIdRef = useRef<number | null>(null);
   const insertCooldownRef = useRef<number>(0);
@@ -476,7 +476,7 @@ export default function LiveWalk() {
 
     try {
       const [{ data: bookings, error: bookingErr }, { data: myProfile, error: profileErr }] = await Promise.all([
-        supabase.from('bookings').select('total_fee').eq('walk_session_id', sessionId),
+        supabase.from('bookings').select('total_fee, did_pee, did_poop').or(`walk_session_id.eq.${sessionId},id.eq.${sessionId}`),
         supabase.from('profiles').select('credit_balance').eq('id', currentUser?.id).single(),
       ]);
 
@@ -484,9 +484,11 @@ export default function LiveWalk() {
       if (profileErr) throw profileErr;
 
       const spent = (bookings || []).reduce((sum, b: any) => sum + Number(b?.total_fee ?? 0), 0);
+      const didPeeAny = (bookings || []).some((b: any) => Boolean(b?.did_pee));
+      const didPoopAny = (bookings || []).some((b: any) => Boolean(b?.did_poop));
       const newBalance = Number((myProfile as any)?.credit_balance ?? 0);
 
-      setReceipt({ spent, newBalance });
+      setReceipt({ spent, newBalance, didPee: didPeeAny, didPoop: didPoopAny });
       setShowReceipt(true);
     } catch (e: any) {
       toast({
@@ -509,7 +511,7 @@ export default function LiveWalk() {
           did_pee: didPee,
           did_poop: didPoop,
         })
-        .eq('walk_session_id', sessionId);
+        .or(`walk_session_id.eq.${sessionId},id.eq.${sessionId}`);
 
       if (error) throw error;
 
@@ -546,6 +548,31 @@ export default function LiveWalk() {
                 Your new balance is <span className="text-slate-900">{formatZAR(receipt?.newBalance ?? 0)}</span>
               </p>
             </div>
+
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white p-4 ring-1 ring-slate-100">
+              <p className="text-sm font-extrabold text-slate-900">Potty report</p>
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-extrabold ring-1 ${
+                    receipt?.didPee
+                      ? 'bg-sky-50 text-sky-900 ring-sky-100'
+                      : 'bg-slate-50 text-slate-600 ring-slate-100'
+                  }`}
+                >
+                  💧 {receipt?.didPee ? 'Pee' : 'No pee'}
+                </span>
+                <span
+                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-extrabold ring-1 ${
+                    receipt?.didPoop
+                      ? 'bg-amber-50 text-amber-900 ring-amber-100'
+                      : 'bg-slate-50 text-slate-600 ring-slate-100'
+                  }`}
+                >
+                  💩 {receipt?.didPoop ? 'Poop' : 'No poop'}
+                </span>
+              </div>
+            </div>
+
             <Separator />
             <div className="flex items-center justify-between rounded-2xl bg-white p-4 ring-1 ring-slate-100">
               <div className="flex items-center gap-2">

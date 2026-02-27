@@ -14,6 +14,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { fetchBookings } from '@/utils/supabase/helpers';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Separator } from '@/components/ui/separator';
 import type { Profile, Booking } from '@/types';
 import {
   MapPin,
@@ -65,6 +69,11 @@ const ProviderDashboard = () => {
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [ratingBooking, setRatingBooking] = useState<Booking | null>(null);
   const [dogNamesById, setDogNamesById] = useState<Record<string, string>>({});
+  const [endWalkBookingId, setEndWalkBookingId] = useState<string | null>(null);
+  const [endWalkNotes, setEndWalkNotes] = useState('');
+  const [endWalkDidPee, setEndWalkDidPee] = useState(false);
+  const [endWalkDidPoop, setEndWalkDidPoop] = useState(false);
+  const [endingWalk, setEndingWalk] = useState(false);
 
   useEffect(() => {
     const hash = location.hash.replace('#', '');
@@ -346,7 +355,19 @@ const ProviderDashboard = () => {
   };
 
   const handleEndWalk = async (bookingId: string) => {
+    // Open a short summary dialog so notes + potty updates are always persisted.
+    setEndWalkBookingId(bookingId);
+    setEndWalkNotes('');
+    setEndWalkDidPee(false);
+    setEndWalkDidPoop(false);
+  };
+
+  const confirmEndWalk = async () => {
+    if (!endWalkBookingId) return;
+
     try {
+      setEndingWalk(true);
+
       if (trackingInterval !== null) {
         clearInterval(trackingInterval);
         setTrackingInterval(null);
@@ -356,20 +377,30 @@ const ProviderDashboard = () => {
 
       const { error } = await supabase
         .from('bookings')
-        .update({ status: 'completed', ended_at: endedAt })
-        .eq('id', bookingId);
+        .update({
+          status: 'completed',
+          ended_at: endedAt,
+          walk_notes: endWalkNotes.trim() || null,
+          did_pee: endWalkDidPee,
+          did_poop: endWalkDidPoop,
+        })
+        .eq('id', endWalkBookingId);
 
       if (error) {
         console.error('Error ending walk:', error);
         alert('Failed to end walk');
-      } else {
-        setActiveBookingId(null);
-        setIsWalking(false);
-        await refreshBookings();
+        return;
       }
+
+      setActiveBookingId(null);
+      setIsWalking(false);
+      setEndWalkBookingId(null);
+      await refreshBookings();
     } catch (err) {
       console.error('Error:', err);
       alert('Failed to end walk');
+    } finally {
+      setEndingWalk(false);
     }
   };
 
@@ -436,6 +467,61 @@ const ProviderDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <RoleNavbar />
+
+      <Dialog open={Boolean(endWalkBookingId)} onOpenChange={(open) => (!open ? setEndWalkBookingId(null) : null)}>
+        <DialogContent className="overflow-hidden rounded-3xl border-slate-200 p-0">
+          <div className="bg-rose-600 px-6 py-5">
+            <DialogHeader>
+              <DialogTitle className="text-base font-extrabold text-white">End Walk Summary</DialogTitle>
+              <DialogDescription className="text-rose-50/90">
+                Add a quick note for the owner and mark potty updates.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="space-y-4 p-6">
+            <div className="space-y-2">
+              <Label htmlFor="end-walk-notes">Notes for the Owner</Label>
+              <Textarea
+                id="end-walk-notes"
+                value={endWalkNotes}
+                onChange={(e) => setEndWalkNotes(e.target.value)}
+                placeholder="e.g., Great 90m walk — lots of sniff time and calm leash work."
+                className="min-h-[110px] rounded-2xl"
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100">
+                <Checkbox checked={endWalkDidPee} onCheckedChange={(v) => setEndWalkDidPee(Boolean(v))} />
+                <span className="text-sm font-semibold text-slate-900">💧 Pee</span>
+              </label>
+              <label className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100">
+                <Checkbox checked={endWalkDidPoop} onCheckedChange={(v) => setEndWalkDidPoop(Boolean(v))} />
+                <span className="text-sm font-semibold text-slate-900">💩 Poop</span>
+              </label>
+            </div>
+
+            <Separator />
+
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button
+                onClick={confirmEndWalk}
+                disabled={endingWalk}
+                className="flex-1 rounded-full bg-rose-600 hover:bg-rose-700"
+              >
+                {endingWalk ? 'Ending…' : 'Complete walk'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setEndWalkBookingId(null)}
+                className="flex-1 rounded-full border-slate-200 bg-white text-slate-900 hover:bg-slate-50"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="container mx-auto px-4 py-8">
         <section id="earnings" className="scroll-mt-24">
