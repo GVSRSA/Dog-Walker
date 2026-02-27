@@ -78,8 +78,8 @@ export const fetchProfile = async (userId: string): Promise<Profile | null> => {
  */
 export const fetchBookings = async (userId: string, role: 'client' | 'provider' = 'client'): Promise<{ data: Booking[]; error: any }> => {
   try {
-    // Include dog name so dashboards can render a real schedule.
-    let query = supabase.from('bookings').select('*, dogs(name)');
+    // Include dog name and owner (client) profile so dashboards can render a real schedule.
+    let query = supabase.from('bookings').select('*, dogs(name, owner_id), client:client_id(full_name)');
     
     if (role === 'client') {
       query = query.eq('client_id', userId);

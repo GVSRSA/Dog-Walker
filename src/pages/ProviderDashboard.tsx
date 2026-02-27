@@ -66,7 +66,6 @@ const ProviderDashboard = () => {
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [ratingBooking, setRatingBooking] = useState<Booking | null>(null);
   const [dogNamesById, setDogNamesById] = useState<Record<string, string>>({});
-  const [clientNamesById, setClientNamesById] = useState<Record<string, string>>({});
   const [endWalkBookingId, setEndWalkBookingId] = useState<string | null>(null);
   const [endWalkNotes, setEndWalkNotes] = useState('');
   const [endWalkDidPee, setEndWalkDidPee] = useState(false);
@@ -149,40 +148,6 @@ const ProviderDashboard = () => {
     };
   }, [bookings]);
 
-  useEffect(() => {
-    const clientIds = Array.from(
-      new Set(
-        (bookings || [])
-          .map((b) => b.client_id)
-          .filter((id): id is string => Boolean(id))
-      )
-    );
-
-    if (clientIds.length === 0) return;
-
-    let cancelled = false;
-
-    const loadClientNames = async () => {
-      const { data, error } = await supabase.from('profiles').select('id,full_name').in('id', clientIds);
-      if (cancelled) return;
-      if (error) {
-        console.error('[provider-dashboard] Error loading clients:', error);
-        return;
-      }
-      const map: Record<string, string> = {};
-      (data || []).forEach((p: any) => {
-        if (p?.id) map[p.id] = p?.full_name || 'Client';
-      });
-      setClientNamesById(map);
-    };
-
-    loadClientNames();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [bookings]);
-
   const dogLabel = useMemo(() => {
     return (dogId?: string | null) => {
       if (!dogId) return 'Dog';
@@ -191,16 +156,12 @@ const ProviderDashboard = () => {
   }, [dogNamesById]);
 
   const bookingDogName = useMemo(() => {
-    return (booking: Booking) => booking?.dogs?.name || dogLabel(booking.dog_id);
-  }, [dogLabel]);
-
-  const bookingClientName = useMemo(() => {
     return (booking: Booking) => {
-      const clientId = booking.client_id;
-      if (!clientId) return 'Client';
-      return clientNamesById[clientId] || 'Client';
+      const dogName = booking?.dogs?.name || dogLabel(booking.dog_id);
+      const ownerName = (booking as any)?.client?.full_name || 'Owner';
+      return `${dogName} (Owner: ${ownerName})`;
     };
-  }, [clientNamesById]);
+  }, [dogLabel]);
 
   // Fetch bookings for provider
   useEffect(() => {
@@ -910,7 +871,7 @@ const ProviderDashboard = () => {
             setRatingBooking(null);
           }}
           onSubmit={handleRatingSubmit}
-          userName={ratingBooking ? bookingClientName(ratingBooking) : 'Client'}
+          userName={ratingBooking ? ((ratingBooking as any)?.client?.full_name || 'Client') : 'Client'}
           isProvider={false}
         />
       </div>
