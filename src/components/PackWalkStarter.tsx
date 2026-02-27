@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Booking } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { CalendarDays, Users, Zap } from 'lucide-react';
+import { CalendarDays, Users, Zap, Dog as DogIcon } from 'lucide-react';
 
 function isToday(value?: string | null) {
   if (!value) return false;
@@ -41,6 +41,8 @@ export default function PackWalkStarter({
 }) {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [creating, setCreating] = useState(false);
+  const [dogNames, setDogNames] = useState<Record<string, string>>({});
+  const [clientNames, setClientNames] = useState<Record<string, string>>({});
 
   const todaysConfirmed = useMemo(() => {
     return bookings
@@ -49,6 +51,54 @@ export default function PackWalkStarter({
       .filter((b) => !b.walk_session_id)
       .filter((b) => isToday(b.scheduled_date));
   }, [bookings, providerId]);
+
+  // Fetch dog names and client names for today's confirmed bookings
+  useEffect(() => {
+    const fetchNames = async () => {
+      if (todaysConfirmed.length === 0) {
+        setDogNames({});
+        setClientNames({});
+        return;
+      }
+
+      const dogIds = todaysConfirmed.map(b => b.dog_id).filter(Boolean) as string[];
+      const clientIds = todaysConfirmed.map(b => b.client_id).filter(Boolean) as string[];
+
+      // Fetch dog names
+      if (dogIds.length > 0) {
+        const { data: dogsData, error: dogsError } = await supabase
+          .from('dogs')
+          .select('id, name')
+          .in('id', dogIds);
+        
+        if (!dogsError && dogsData) {
+          const namesMap: Record<string, string> = {};
+          dogsData.forEach((dog: any) => {
+            if (dog?.id) namesMap[dog.id] = dog.name || 'Dog';
+          });
+          setDogNames(namesMap);
+        }
+      }
+
+      // Fetch client names
+      if (clientIds.length > 0) {
+        const { data: clientsData, error: clientsError } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', clientIds);
+        
+        if (!clientsError && clientsData) {
+          const namesMap: Record<string, string> = {};
+          clientsData.forEach((client: any) => {
+            if (client?.id) namesMap[client.id] = client.full_name || 'Owner';
+          });
+          setClientNames(namesMap);
+        }
+      }
+    };
+
+    fetchNames();
+  }, [todaysConfirmed]);
 
   const selectedIds = useMemo(() => Object.entries(selected).filter(([, v]) => v).map(([id]) => id), [selected]);
 
@@ -154,17 +204,23 @@ export default function PackWalkStarter({
                       onCheckedChange={(v) => toggleOne(b.id, Boolean(v))}
                       className="mt-0.5"
                     />
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-extrabold text-slate-900">Booking {b.id.slice(0, 8)}…</p>
-                        <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">Confirmed</Badge>
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-full bg-violet-100 flex items-center justify-center">
+                        <DogIcon className="h-4 w-4 text-violet-700" />
                       </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
-                        <span className="inline-flex items-center gap-1">
-                          <CalendarDays className="h-3.5 w-3.5 text-slate-500" />
-                          {b.scheduled_at ? format(new Date(b.scheduled_at), 'PPP p') : b.scheduled_date}
-                        </span>
-                        <span>Client {b.client_id?.slice(0, 8)}…</span>
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-extrabold text-slate-900">
+                            {dogNames[b.dog_id || ''] || 'Dog'} (Owner: {clientNames[b.client_id || ''] || 'Owner'})
+                          </p>
+                          <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">Confirmed</Badge>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
+                          <span className="inline-flex items-center gap-1">
+                            <CalendarDays className="h-3.5 w-3.5 text-slate-500" />
+                            {b.scheduled_at ? format(new Date(b.scheduled_at), 'PPP p') : b.scheduled_date}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
