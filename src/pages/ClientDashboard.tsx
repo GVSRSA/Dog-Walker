@@ -449,7 +449,7 @@ const ClientDashboard = () => {
           )}
 
           {/* Stats Cards */}
-          <div className="grid md:grid-cols-4 gap-6 mb-8">
+          <div className="grid md:grid-cols-5 gap-6 mb-8">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">My Dogs</CardTitle>
@@ -527,6 +527,19 @@ const ClientDashboard = () => {
                     <p className="text-xs text-gray-600">All time walks</p>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Available Credits</CardTitle>
+                <DollarSign className="h-4 w-4 text-emerald-600" />
+              </CardHeader>
+              <CardContent>
+                <div>
+                  <div className="text-2xl font-bold">R{currentUser?.credit_balance?.toFixed(2) || '0.00'}</div>
+                  <p className="text-xs text-gray-600">Credit balance</p>
+                </div>
               </CardContent>
             </Card>
           </div>
