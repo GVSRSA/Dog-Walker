@@ -1,5 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useMemo, useState } from 'react';
 import type { Booking } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { CalendarDays, Users, Zap, Dog as DogIcon } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 function isToday(value?: string | null) {
   if (!value) return false;
@@ -41,9 +41,8 @@ export default function PackWalkStarter({
 }) {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [creating, setCreating] = useState(false);
-  const [dogNames, setDogNames] = useState<Record<string, string>>({});
-  const [clientNames, setClientNames] = useState<Record<string, string>>({});
 
+  // Match the Daily Schedule filtering logic exactly
   const todaysConfirmed = useMemo(() => {
     const todayBookings = bookings
       .filter((b) => b.status === 'confirmed')
@@ -61,59 +60,13 @@ export default function PackWalkStarter({
         scheduled_date: todayBookings[0].scheduled_date,
         provider_id: todayBookings[0].provider_id,
         walk_session_id: todayBookings[0].walk_session_id,
+        hasDogsData: !!todayBookings[0].dogs,
+        hasClientData: !!(todayBookings[0] as any).client,
       } : null
     });
     
     return todayBookings;
   }, [bookings, providerId]);
-
-  // Fetch dog names and client names for today's confirmed bookings
-  useEffect(() => {
-    const fetchNames = async () => {
-      if (todaysConfirmed.length === 0) {
-        setDogNames({});
-        setClientNames({});
-        return;
-      }
-
-      const dogIds = todaysConfirmed.map(b => b.dog_id).filter(Boolean) as string[];
-      const clientIds = todaysConfirmed.map(b => b.client_id).filter(Boolean) as string[];
-
-      // Fetch dog names
-      if (dogIds.length > 0) {
-        const { data: dogsData, error: dogsError } = await supabase
-          .from('dogs')
-          .select('id, name')
-          .in('id', dogIds);
-        
-        if (!dogsError && dogsData) {
-          const namesMap: Record<string, string> = {};
-          dogsData.forEach((dog: any) => {
-            if (dog?.id) namesMap[dog.id] = dog.name || 'Dog';
-          });
-          setDogNames(namesMap);
-        }
-      }
-
-      // Fetch client names
-      if (clientIds.length > 0) {
-        const { data: clientsData, error: clientsError } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .in('id', clientIds);
-        
-        if (!clientsError && clientsData) {
-          const namesMap: Record<string, string> = {};
-          clientsData.forEach((client: any) => {
-            if (client?.id) namesMap[client.id] = client.full_name || 'Owner';
-          });
-          setClientNames(namesMap);
-        }
-      }
-    };
-
-    fetchNames();
-  }, [todaysConfirmed]);
 
   const selectedIds = useMemo(() => Object.entries(selected).filter(([, v]) => v).map(([id]) => id), [selected]);
 
@@ -176,6 +129,16 @@ export default function PackWalkStarter({
     }
   };
 
+  // Helper to get dog name from the joined data
+  const getDogName = (booking: Booking) => {
+    return booking?.dogs?.name || 'Dog';
+  };
+
+  // Helper to get client name from the joined data
+  const getClientName = (booking: Booking) => {
+    return (booking as any)?.client?.full_name || 'Owner';
+  };
+
   return (
     <Card className="rounded-3xl border-slate-200 bg-white">
       <CardHeader className="pb-3">
@@ -226,7 +189,7 @@ export default function PackWalkStarter({
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="text-sm font-extrabold text-slate-900">
-                            {dogNames[b.dog_id || ''] || 'Dog'} (Owner: {clientNames[b.client_id || ''] || 'Owner'})
+                            {getDogName(b)} (Owner: {getClientName(b)})
                           </p>
                           <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">Confirmed</Badge>
                         </div>
