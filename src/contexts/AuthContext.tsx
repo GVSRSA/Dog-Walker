@@ -55,14 +55,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [needsProfileCompletion, setNeedsProfileCompletion] = useState(false);
 
   useEffect(() => {
-    let didHandleFirstAuthEvent = false;
+    let isMounted = true;
 
-    const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log('[AuthContext] Auth state change received:', { event: _event, hasSession: !!session });
+    const handleSession = async (session: any) => {
+      if (!isMounted) return;
+
+      console.log('[AuthContext] Auth session check:', { hasSession: !!session });
 
       if (session?.user) {
         // Validate the session (handles stale/invalid refresh tokens)
         const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (!isMounted) return;
 
         if (error || !user) {
           console.log('[AuthContext] Session invalid, clearing it:', error?.message);
@@ -76,52 +80,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setCurrentUser(null);
           setIsAuthenticated(false);
           setNeedsProfileCompletion(false);
-        } else {
-          console.log('[AuthContext] User found:', { id: user.id, email: user.email });
+          return;
+        }
 
-          try {
-            const { data: profile, error: profileError } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', user.id)
-              .single();
+        console.log('[AuthContext] User found:', { id: user.id, email: user.email });
 
-            if (profileError) {
-              if (profileError.code === 'PGRST116') {
-                console.log('[AuthContext] Profile not found, user needs to complete profile');
-                setCurrentUser(null);
-                setIsAuthenticated(false);
-                setNeedsProfileCompletion(true);
-              } else if (profileError.code === '42P01') {
-                console.error('[AuthContext] Profiles table does not exist:', profileError.message);
-                setCurrentUser(null);
-                setIsAuthenticated(false);
-                setNeedsProfileCompletion(false);
-              } else {
-                console.error('[AuthContext] Profile fetch error:', profileError.message, profileError.code);
-                setCurrentUser(null);
-                setIsAuthenticated(false);
-                setNeedsProfileCompletion(false);
-              }
-            } else if (profile) {
-              console.log('[AuthContext] Profile loaded from DB:', {
-                id: profile.id,
-                role: profile.role,
-                is_approved: profile.is_approved,
-                full_name: profile.full_name,
-              });
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
 
-              const transformedProfile = transformProfile(profile);
-              setCurrentUser(transformedProfile);
-              setIsAuthenticated(true);
+          if (!isMounted) return;
+
+          if (profileError) {
+            if (profileError.code === 'PGRST116') {
+              console.log('[AuthContext] Profile not found, user needs to complete profile');
+              setCurrentUser(null);
+              setIsAuthenticated(false);
+              setNeedsProfileCompletion(true);
+            } else if (profileError.code === '42P01') {
+              console.error('[AuthContext] Profiles table does not exist:', profileError.message);
+              setCurrentUser(null);
+              setIsAuthenticated(false);
+              setNeedsProfileCompletion(false);
+            } else {
+              console.error('[AuthContext] Profile fetch error:', profileError.message, profileError.code);
+              setCurrentUser(null);
+              setIsAuthenticated(false);
               setNeedsProfileCompletion(false);
             }
-          } catch (err) {
-            console.error('[AuthContext] Unexpected error fetching profile:', err);
-            setCurrentUser(null);
-            setIsAuthenticated(false);
-            setNeedsProfileCompletion(true);
+          } else if (profile) {
+            console.log('[AuthContext] Profile loaded from DB:', {
+              id: profile.id,
+              role: profile.role,
+              is_approved: profile.is_approved,
+              full_name: profile.full_name,
+            });
+
+            const transformedProfile = transformProfile(profile);
+            setCurrentUser(transformedProfile);
+            setIsAuthenticated(true);
+            setNeedsProfileCompletion(false);
           }
+        } catch (err) {
+          if (!isMounted) return;
+          console.error('[AuthContext] Unexpected error fetching profile:', err);
+          setCurrentUser(null);
+          setIsAuthenticated(false);
+          setNeedsProfileCompletion(true);
         }
       } else {
         console.log('[AuthContext] No session found, treating as guest');
@@ -129,14 +137,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsAuthenticated(false);
         setNeedsProfileCompletion(false);
       }
+    };
 
-      if (!didHandleFirstAuthEvent) {
-        didHandleFirstAuthEvent = true;
+    // 1) Check current session first (prevents auth-route flashing and avoids "hanging" on CSP/network issues)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      handleSession(session).finally(() => {
+        if (!isMounted) return;
         setInitializing(false);
-      }
+      });
+    });
+
+    // 2) Then listen for changes
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      handleSession(session).finally(() => {
+        if (!isMounted) return;
+        setInitializing(false);
+      });
     });
 
     return () => {
+      isMounted = false;
       data.subscription.unsubscribe();
     };
   }, []);
