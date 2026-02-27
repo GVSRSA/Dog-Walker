@@ -95,6 +95,10 @@ const ClientDashboard = () => {
       setLoadingProviders(true);
       try {
         const { data, error } = await fetchProviders();
+        console.log('[ClientDashboard] Fetched providers:', {
+          count: data?.length,
+          providers: data
+        });
         if (error) {
           console.error('Error fetching providers:', error);
         } else {
@@ -122,6 +126,11 @@ const ClientDashboard = () => {
           .select('*')
           .eq('client_id', currentUser.id)
           .order('scheduled_at', { ascending: true, nullsFirst: false });
+
+        console.log('[ClientDashboard] Fetched bookings for user:', currentUser.id, {
+          count: data?.length,
+          bookings: data
+        });
 
         if (error) {
           console.error('Error fetching bookings:', error);
@@ -381,6 +390,12 @@ const ClientDashboard = () => {
   const activeBookings = bookings.filter((b) => b.status === 'active');
   const upcomingBookings = bookings.filter((b) => b.status === 'pending' || b.status === 'confirmed');
   const completedBookings = bookings.filter((b) => b.status === 'completed');
+
+  // Debug logging for completed bookings
+  console.log('[ClientDashboard] Current user ID:', currentUser?.id);
+  console.log('[ClientDashboard] All bookings:', bookings);
+  console.log('[ClientDashboard] Completed bookings:', completedBookings);
+  console.log('[ClientDashboard] Completed bookings count:', completedBookings.length);
 
   const [showBookingModal, setShowBookingModal] = useState(false);
 
