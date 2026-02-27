@@ -467,6 +467,17 @@ const ProviderDashboard = () => {
   const activeBookings = bookings.filter((b) => (b.status === 'active' || b.status === 'in_progress') && !b.walk_session_id);
   const completedBookings = bookings.filter((b) => b.status === 'completed');
 
+  // Debug logging
+  console.log('[ProviderDashboard] Filtered bookings:', {
+    totalBookings: bookings.length,
+    confirmedBookings: confirmedBookings.length,
+    todaysConfirmedBookings: todaysConfirmedBookings.length,
+    currentUser: {
+      id: currentUser?.id,
+      role: currentUser?.role
+    }
+  });
+
   const completedWalkCount = bookings.filter((b) => b.status === 'completed').length;
 
   const totalEarnings = completedBookings.reduce((sum, b) => {

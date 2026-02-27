@@ -45,11 +45,26 @@ export default function PackWalkStarter({
   const [clientNames, setClientNames] = useState<Record<string, string>>({});
 
   const todaysConfirmed = useMemo(() => {
-    return bookings
-      .filter((b) => b.provider_id === providerId)
+    const todayBookings = bookings
       .filter((b) => b.status === 'confirmed')
       .filter((b) => !b.walk_session_id)
       .filter((b) => isToday(b.scheduled_date));
+    
+    console.log('[PackWalkStarter] Filtering bookings:', {
+      totalBookings: bookings.length,
+      confirmedBookings: bookings.filter(b => b.status === 'confirmed').length,
+      confirmedToday: todayBookings.length,
+      providerId,
+      sampleBooking: todayBookings[0] ? {
+        id: todayBookings[0].id,
+        status: todayBookings[0].status,
+        scheduled_date: todayBookings[0].scheduled_date,
+        provider_id: todayBookings[0].provider_id,
+        walk_session_id: todayBookings[0].walk_session_id,
+      } : null
+    });
+    
+    return todayBookings;
   }, [bookings, providerId]);
 
   // Fetch dog names and client names for today's confirmed bookings
