@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { RatingModal } from '@/components/RatingModal';
+import BookingReceiptDialog from '@/components/BookingReceiptDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchDogs, fetchProviders, fetchReviews } from '@/utils/supabase/helpers';
 import { supabase } from '@/integrations/supabase/client';
@@ -581,8 +582,10 @@ const ClientDashboard = () => {
                 <div className="space-y-4">
                   {completedBookings.map((booking) => {
                     const provider = providers.find((p) => p.id === booking.provider_id);
+                    const dog = myDogs.find((d) => d.id === booking.dog_id) || null;
+
                     return (
-                      <div key={booking.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div key={booking.id} className="flex items-center justify-between gap-4 p-4 bg-gray-50 rounded-lg">
                         <div>
                           <p className="font-semibold">{provider?.full_name}</p>
                           <p className="text-sm text-gray-600">
@@ -591,10 +594,17 @@ const ClientDashboard = () => {
                           </p>
                           <p className="text-sm text-gray-600">• R{booking.total_fee?.toFixed(2) || 'N/A'}</p>
                         </div>
-                        <Button size="sm" onClick={() => handleRateBooking(booking)} className="bg-amber-600 hover:bg-amber-700">
-                          <Star className="w-4 h-4 mr-2" />
-                          Rate
-                        </Button>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <BookingReceiptDialog booking={booking} provider={provider} dog={dog} />
+                          <Button
+                            size="sm"
+                            onClick={() => handleRateBooking(booking)}
+                            className="rounded-full bg-amber-600 hover:bg-amber-700"
+                          >
+                            <Star className="w-4 h-4 mr-2" />
+                            Rate
+                          </Button>
+                        </div>
                       </div>
                     );
                   })}

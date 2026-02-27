@@ -59,6 +59,8 @@ export interface Booking {
   platform_fee?: number;
   provider_payout?: number;
   created_at?: string;
+  started_at?: string | null;
+  ended_at?: string | null;
   walk_session_id?: string | null;
   walk_notes?: string | null;
   did_pee?: boolean | null;
