@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AppProvider, useApp } from "./contexts/AppContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import FullScreenAuthLoading from "@/components/FullScreenAuthLoading";
 import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -72,6 +73,12 @@ const AuthRedirectHandler = () => {
 };
 
 const AppContent = () => {
+  const { initializing } = useAuth();
+
+  if (initializing) {
+    return <FullScreenAuthLoading />;
+  }
+
   return (
     <>
       <AuthRedirectHandler />

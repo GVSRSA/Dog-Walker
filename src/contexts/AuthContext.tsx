@@ -8,6 +8,7 @@ interface AuthContextType {
   setCurrentUser: (user: Profile | null) => void;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  initializing: boolean;
   login: (email: string, password: string) => Promise<Profile | null>;
   register: (email: string, password: string, fullName: string, role: 'client' | 'provider') => Promise<Profile | null>;
   logout: () => void;
@@ -49,96 +50,95 @@ const transformProfile = (dbProfile: any): Profile => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<Profile | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [initializing, setInitializing] = useState(true);
   const [needsRedirectToLanding, setNeedsRedirectToLanding] = useState(false);
   const [needsProfileCompletion, setNeedsProfileCompletion] = useState(false);
 
   useEffect(() => {
-    const initUser = async () => {
-      console.log('[AuthContext] Checking user session...');
-      const { data: { user }, error } = await supabase.auth.getUser();
-      
-      if (error) {
-        console.log('[AuthContext] Session invalid, clearing it:', error.message);
-        // Silently clear the invalid session
-        await supabase.auth.signOut();
-        // Only set redirect flag if not already on landing page
-        const currentPath = window.location.pathname;
-        if (currentPath !== '/' && currentPath !== '/login' && currentPath !== '/register') {
-          setNeedsRedirectToLanding(true);
-        }
-        return;
-      }
-      
-      if (user) {
-        console.log('[AuthContext] User found:', { id: user.id, email: user.email });
-        // Fetch profile from database - using select(*) for simplicity and safety
-        // ALWAYS fetch fresh data on page load - don't use cached values
-        try {
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-          
-          if (profileError) {
-            // Check for specific error types
-            if (profileError.code === 'PGRST116') {
-              // Profile not found - user needs to complete profile
-              console.log('[AuthContext] Profile not found, user needs to complete profile');
-              setCurrentUser(null);
-              setIsAuthenticated(false);
-              setNeedsProfileCompletion(true);
-              return;
-            } else if (profileError.code === '42P01') {
-              // Table does not exist - critical system error
-              console.error('[AuthContext] Profiles table does not exist:', profileError.message);
-              setCurrentUser(null);
-              setIsAuthenticated(false);
-              setNeedsProfileCompletion(false);
-              return;
-            } else {
-              // Other errors - log but don't trigger profile completion
-              console.error('[AuthContext] Profile fetch error:', profileError.message, profileError.code);
-              setCurrentUser(null);
-              setIsAuthenticated(false);
-              setNeedsProfileCompletion(false);
-              return;
-            }
+    let didHandleFirstAuthEvent = false;
+
+    const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      console.log('[AuthContext] Auth state change received:', { event: _event, hasSession: !!session });
+
+      if (session?.user) {
+        // Validate the session (handles stale/invalid refresh tokens)
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (error || !user) {
+          console.log('[AuthContext] Session invalid, clearing it:', error?.message);
+          await supabase.auth.signOut();
+
+          const currentPath = window.location.pathname;
+          if (currentPath !== '/' && currentPath !== '/login' && currentPath !== '/register') {
+            setNeedsRedirectToLanding(true);
           }
-          
-          if (profile) {
-            console.log('[AuthContext] Profile loaded from DB:', { 
-              id: profile.id, 
-              role: profile.role, 
-              is_approved: profile.is_approved,
-              full_name: profile.full_name
-            });
-            const transformedProfile = transformProfile(profile);
-            console.log('[AuthContext] Transformed profile with admin auto-approval:', { 
-              id: transformedProfile.id, 
-              role: transformedProfile.role, 
-              is_approved: transformedProfile.is_approved 
-            });
-            setCurrentUser(transformedProfile);
-            setIsAuthenticated(true);
-            setNeedsProfileCompletion(false);
-          }
-        } catch (err) {
-          console.error('[AuthContext] Unexpected error fetching profile:', err);
+
           setCurrentUser(null);
           setIsAuthenticated(false);
-          setNeedsProfileCompletion(true);
+          setNeedsProfileCompletion(false);
+        } else {
+          console.log('[AuthContext] User found:', { id: user.id, email: user.email });
+
+          try {
+            const { data: profile, error: profileError } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', user.id)
+              .single();
+
+            if (profileError) {
+              if (profileError.code === 'PGRST116') {
+                console.log('[AuthContext] Profile not found, user needs to complete profile');
+                setCurrentUser(null);
+                setIsAuthenticated(false);
+                setNeedsProfileCompletion(true);
+              } else if (profileError.code === '42P01') {
+                console.error('[AuthContext] Profiles table does not exist:', profileError.message);
+                setCurrentUser(null);
+                setIsAuthenticated(false);
+                setNeedsProfileCompletion(false);
+              } else {
+                console.error('[AuthContext] Profile fetch error:', profileError.message, profileError.code);
+                setCurrentUser(null);
+                setIsAuthenticated(false);
+                setNeedsProfileCompletion(false);
+              }
+            } else if (profile) {
+              console.log('[AuthContext] Profile loaded from DB:', {
+                id: profile.id,
+                role: profile.role,
+                is_approved: profile.is_approved,
+                full_name: profile.full_name,
+              });
+
+              const transformedProfile = transformProfile(profile);
+              setCurrentUser(transformedProfile);
+              setIsAuthenticated(true);
+              setNeedsProfileCompletion(false);
+            }
+          } catch (err) {
+            console.error('[AuthContext] Unexpected error fetching profile:', err);
+            setCurrentUser(null);
+            setIsAuthenticated(false);
+            setNeedsProfileCompletion(true);
+          }
         }
       } else {
-        // No session - treat as guest (silent fail, no alerts)
         console.log('[AuthContext] No session found, treating as guest');
         setCurrentUser(null);
         setIsAuthenticated(false);
         setNeedsProfileCompletion(false);
       }
+
+      if (!didHandleFirstAuthEvent) {
+        didHandleFirstAuthEvent = true;
+        setInitializing(false);
+      }
+    });
+
+    return () => {
+      data.subscription.unsubscribe();
     };
-    
-    initUser();
   }, []);
 
   const login = async (email: string, password: string): Promise<Profile | null> => {
@@ -366,6 +366,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentUser,
     isAuthenticated,
     isAdmin: currentUser?.role === 'admin' || currentUser?.email === 'ddb@glasseye.co.za',
+    initializing,
     login,
     register,
     logout,
