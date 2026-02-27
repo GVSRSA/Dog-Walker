@@ -20,12 +20,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import type { Profile, Booking } from '@/types';
 import {
-  MapPin,
   Clock,
   DollarSign,
   Star,
-  ShoppingCart,
-  Play,
   Square,
   CreditCard,
 } from 'lucide-react';
@@ -69,6 +66,7 @@ const ProviderDashboard = () => {
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [ratingBooking, setRatingBooking] = useState<Booking | null>(null);
   const [dogNamesById, setDogNamesById] = useState<Record<string, string>>({});
+  const [clientNamesById, setClientNamesById] = useState<Record<string, string>>({});
   const [endWalkBookingId, setEndWalkBookingId] = useState<string | null>(null);
   const [endWalkNotes, setEndWalkNotes] = useState('');
   const [endWalkDidPee, setEndWalkDidPee] = useState(false);
@@ -151,6 +149,40 @@ const ProviderDashboard = () => {
     };
   }, [bookings]);
 
+  useEffect(() => {
+    const clientIds = Array.from(
+      new Set(
+        (bookings || [])
+          .map((b) => b.client_id)
+          .filter((id): id is string => Boolean(id))
+      )
+    );
+
+    if (clientIds.length === 0) return;
+
+    let cancelled = false;
+
+    const loadClientNames = async () => {
+      const { data, error } = await supabase.from('profiles').select('id,full_name').in('id', clientIds);
+      if (cancelled) return;
+      if (error) {
+        console.error('[provider-dashboard] Error loading clients:', error);
+        return;
+      }
+      const map: Record<string, string> = {};
+      (data || []).forEach((p: any) => {
+        if (p?.id) map[p.id] = p?.full_name || 'Client';
+      });
+      setClientNamesById(map);
+    };
+
+    loadClientNames();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bookings]);
+
   const dogLabel = useMemo(() => {
     return (dogId?: string | null) => {
       if (!dogId) return 'Dog';
@@ -161,6 +193,14 @@ const ProviderDashboard = () => {
   const bookingDogName = useMemo(() => {
     return (booking: Booking) => booking?.dogs?.name || dogLabel(booking.dog_id);
   }, [dogLabel]);
+
+  const bookingClientName = useMemo(() => {
+    return (booking: Booking) => {
+      const clientId = booking.client_id;
+      if (!clientId) return 'Client';
+      return clientNamesById[clientId] || 'Client';
+    };
+  }, [clientNamesById]);
 
   // Fetch bookings for provider
   useEffect(() => {
@@ -188,27 +228,34 @@ const ProviderDashboard = () => {
   const handleRatingSubmit = async (rating: number, comment: string) => {
     if (!ratingBooking || !rating) return;
 
+    const bookingId = ratingBooking.id;
+    const clientId = ratingBooking.client_id;
+
+    if (!bookingId || !clientId) {
+      toast({ title: 'Missing booking data', description: 'Could not determine the client for this booking.', variant: 'destructive' });
+      return;
+    }
+
     try {
-      const { error } = await supabase.from('reviews').insert({
-        booking_id: ratingBooking.id,
-        reviewer_id: currentUser.id,
-        provider_id: ratingBooking.provider_id,
+      const { error } = await supabase.from('client_ratings').insert({
+        booking_id: bookingId,
+        provider_id: currentUser.id,
+        client_id: clientId,
         rating,
-        comment,
-        created_at: new Date().toISOString(),
+        comment: comment?.trim() || null,
       });
 
       if (error) {
-        console.error('[provider-dashboard] Error submitting review:', error);
-        toast({ title: 'Could not submit review', description: error.message, variant: 'destructive' });
+        console.error('[provider-dashboard] Error submitting client rating:', error);
+        toast({ title: 'Could not submit rating', description: error.message, variant: 'destructive' });
       } else {
         setShowRatingModal(false);
         setRatingBooking(null);
-        toast({ title: 'Review submitted', description: 'Thanks for the feedback.' });
+        toast({ title: 'Client rated', description: 'Thanks — your feedback helps keep the community strong.' });
       }
     } catch (err: any) {
       console.error('[provider-dashboard] Error:', err);
-      toast({ title: 'Could not submit review', description: err?.message || 'Please try again.', variant: 'destructive' });
+      toast({ title: 'Could not submit rating', description: err?.message || 'Please try again.', variant: 'destructive' });
     }
   };
 
@@ -459,9 +506,11 @@ const ProviderDashboard = () => {
   const activeBookings = bookings.filter((b) => (b.status === 'active' || b.status === 'in_progress') && !b.walk_session_id);
   const completedBookings = bookings.filter((b) => b.status === 'completed');
 
+  const completedWalkCount = completedBookings.length;
+
   const totalEarnings = completedBookings.reduce((sum, b) => {
-    const fee = typeof b.total_fee === 'number' ? b.total_fee : Number(b.total_fee);
-    return sum + (Number.isFinite(fee) ? fee : 0);
+    const payout = typeof b.provider_payout === 'number' ? b.provider_payout : Number(b.provider_payout);
+    return sum + (Number.isFinite(payout) ? payout : 0);
   }, 0);
 
   return (
@@ -561,7 +610,7 @@ const ProviderDashboard = () => {
                 <Clock className="h-4 w-4 text-blue-700" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{provider.total_walks || 0}</div>
+                <div className="text-2xl font-bold">{completedWalkCount}</div>
               </CardContent>
             </Card>
 
@@ -572,6 +621,7 @@ const ProviderDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">R{totalEarnings.toFixed(2)}</div>
+                <p className="mt-1 text-xs font-semibold text-slate-500">Net after commission</p>
               </CardContent>
             </Card>
           </div>
@@ -742,7 +792,7 @@ const ProviderDashboard = () => {
                       <TableRow>
                         <TableHead>Dog</TableHead>
                         <TableHead>Date</TableHead>
-                        <TableHead>Earnings</TableHead>
+                        <TableHead>Net Earnings</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Action</TableHead>
                       </TableRow>
@@ -751,7 +801,7 @@ const ProviderDashboard = () => {
                       {[...completedBookings, ...bookings.filter((b) => b.status === 'cancelled')].map((booking) => {
                         const minutes = Number(booking.duration ?? 0);
                         const durationLabel = minutes > 0 ? `${minutes}m` : '—';
-                        const earnings = Number(booking.total_fee ?? 0);
+                        const earnings = Number(booking.provider_payout ?? 0);
 
                         return (
                           <TableRow key={booking.id}>
@@ -770,7 +820,11 @@ const ProviderDashboard = () => {
                             </TableCell>
                             <TableCell>
                               {booking.status === 'completed' && (
-                                <Button size="sm" onClick={() => handleRateBooking(booking)} className="bg-amber-600 hover:bg-amber-700">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleRateBooking(booking)}
+                                  className="bg-amber-600 hover:bg-amber-700"
+                                >
                                   <Star className="w-4 h-4 mr-2" />
                                   Rate Client
                                 </Button>
@@ -850,10 +904,13 @@ const ProviderDashboard = () => {
 
         <RatingModal
           isOpen={showRatingModal}
-          onClose={() => setShowRatingModal(false)}
+          onClose={() => {
+            setShowRatingModal(false);
+            setRatingBooking(null);
+          }}
           onSubmit={handleRatingSubmit}
-          userName={(ratingBooking as any)?.client?.full_name || 'Client'}
-          isProvider={true}
+          userName={ratingBooking ? bookingClientName(ratingBooking) : 'Client'}
+          isProvider={false}
         />
       </div>
     </div>
