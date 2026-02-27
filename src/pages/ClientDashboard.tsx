@@ -293,7 +293,7 @@ const ClientDashboard = () => {
 
     try {
       const minutes = Number.parseInt(selectedDuration, 10);
-      const providerRate = Number(selectedProvider.walk_rate ?? selectedProvider.hourly_rate ?? 0);
+      const providerRate = Number(selectedProvider.hourly_rate || selectedProvider.walk_rate || 0);
 
       // Calculate fees
       const totalFee = (minutes / 60) * providerRate;
@@ -677,7 +677,7 @@ const ClientDashboard = () => {
                               </div>
                               <div className="flex items-center space-x-1">
                                 <DollarSign className="w-4 h-4 text-blue-700" />
-                                <span className="font-semibold">R{provider.hourly_rate || 0}/hour</span>
+                                <span className="font-semibold">R{provider.hourly_rate || provider.walk_rate || 0}/hour</span>
                               </div>
                             </div>
                             {provider.services && provider.services.length > 0 && (
@@ -816,7 +816,7 @@ const ClientDashboard = () => {
                                         <p className="mt-1 text-3xl font-extrabold tracking-tight text-emerald-950">
                                           R{(
                                             (Number.parseInt(selectedDuration, 10) / 60) *
-                                            Number(selectedProvider?.walk_rate ?? selectedProvider?.hourly_rate ?? 0)
+                                            Number(selectedProvider?.hourly_rate || selectedProvider?.walk_rate || 0)
                                           ).toFixed(2)}
                                         </p>
                                         <p className="mt-1 text-xs font-semibold text-emerald-900/80">
