@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import RoleNavbar from '@/components/RoleNavbar';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,7 @@ import {
   Navigation,
   Clock,
   MapPin,
+  Users,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -58,6 +59,27 @@ const ClientDashboard = () => {
   const [breadcrumbs, setBreadcrumbs] = useState<any[]>([]);
   const [loadingBreadcrumbs, setLoadingBreadcrumbs] = useState(false);
   const [activeWalkBreadcrumbs, setActiveWalkBreadcrumbs] = useState<any[]>([]);
+
+  const activeBookings = bookings.filter((b) => b.status === 'active');
+  const upcomingBookings = bookings.filter((b) => b.status === 'pending' || b.status === 'confirmed');
+  const completedBookings = bookings.filter((b) => b.status === 'completed');
+
+  // Group active bookings by walk_session_id to show pack walks
+  const groupedActiveWalks = useMemo(() => {
+    const groups: Record<string, Booking[]> = {};
+    activeBookings.forEach((booking) => {
+      const sessionId = booking.walk_session_id || booking.id;
+      if (!groups[sessionId]) {
+        groups[sessionId] = [];
+      }
+      groups[sessionId].push(booking);
+    });
+    return groups;
+  }, [activeBookings]);
+
+  const myActiveWalkIds = Object.values(groupedActiveWalks).filter(group => 
+    group.some(b => b.client_id === currentUser?.id)
+  ).flatMap(group => group.map(b => b.walk_session_id || b.id));
 
   useEffect(() => {
     const hash = location.hash.replace('#', '');
@@ -169,11 +191,9 @@ const ClientDashboard = () => {
     }
   }, [selectedProviderForReviews?.id]);
 
-  // Fetch breadcrumbs for active walk
+  // Fetch breadcrumbs for all active walks
   useEffect(() => {
-    const activeBooking = bookings.find((b) => b.status === 'active' || b.status === 'in_progress');
-    const sessionId = activeBooking?.walk_session_id || activeBooking?.id;
-    if (!sessionId) {
+    if (myActiveWalkIds.length === 0) {
       setActiveWalkBreadcrumbs([]);
       return;
     }
@@ -184,9 +204,9 @@ const ClientDashboard = () => {
         const { data, error } = await supabase
           .from('walk_breadcrumbs')
           .select('*')
-          .eq('walk_session_id', sessionId)
+          .in('walk_session_id', myActiveWalkIds)
           .order('created_at', { ascending: false })
-          .limit(10);
+          .limit(50);
 
         if (error) {
           console.error('Error fetching breadcrumbs:', error);
@@ -202,29 +222,32 @@ const ClientDashboard = () => {
 
     fetchBreadcrumbs();
 
-    const channel = supabase
-      .channel(`walk_breadcrumbs:${sessionId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'walk_breadcrumbs',
-          filter: `walk_session_id=eq.${sessionId}`,
-        },
-        (payload) => {
-          setActiveWalkBreadcrumbs((prev) => {
-            const next = [payload.new as any, ...prev];
-            return next.slice(0, 10);
-          });
-        }
-      )
-      .subscribe();
+    // Subscribe to all active walk sessions
+    const channels = myActiveWalkIds.map(sessionId => 
+      supabase
+        .channel(`walk_breadcrumbs:${sessionId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'walk_breadcrumbs',
+            filter: `walk_session_id=eq.${sessionId}`,
+          },
+          (payload) => {
+            setActiveWalkBreadcrumbs((prev) => {
+              const next = [payload.new as any, ...prev];
+              return next.slice(0, 50);
+            });
+          }
+        )
+        .subscribe()
+    );
 
     return () => {
-      supabase.removeChannel(channel);
+      channels.forEach(channel => supabase.removeChannel(channel));
     };
-  }, [bookings]);
+  }, [bookings, myActiveWalkIds]);
 
   const handleRateBooking = (booking: Booking) => {
     setRatingBooking(booking);
@@ -387,10 +410,6 @@ const ClientDashboard = () => {
     return (R * c).toFixed(1);
   };
 
-  const activeBookings = bookings.filter((b) => b.status === 'active');
-  const upcomingBookings = bookings.filter((b) => b.status === 'pending' || b.status === 'confirmed');
-  const completedBookings = bookings.filter((b) => b.status === 'completed');
-
   // Debug logging for completed bookings
   console.log('[ClientDashboard] Current user ID:', currentUser?.id);
   console.log('[ClientDashboard] All bookings:', bookings);
@@ -509,37 +528,94 @@ const ClientDashboard = () => {
         </section>
 
         <section id="bookings" className="scroll-mt-24">
-          {/* Active Walk Alert */}
-          {activeBookings.length > 0 && (
+          {/* Active Walk Alert - Shows pack walks with multiple dogs */}
+          {Object.keys(groupedActiveWalks).length > 0 && (
             <Card className="mb-8 border-green-300 bg-green-50">
               <CardHeader>
-                <CardTitle className="text-green-900">🐕 Walk in Progress!</CardTitle>
-                <CardDescription>Your furry friend is on an adventure</CardDescription>
+                <CardTitle className="text-green-900">🐕 Pack Walk In Progress!</CardTitle>
+                <CardDescription>Your dog(s) are on an adventure</CardDescription>
               </CardHeader>
               <CardContent>
-                {activeBookings.map((booking) => {
-                  const provider = providers.find((p) => p.id === booking.provider_id);
+                {Object.entries(groupedActiveWalks).map(([sessionId, walkBookings]) => {
+                  const myBookingsInWalk = walkBookings.filter(b => b.client_id === currentUser?.id);
+                  if (myBookingsInWalk.length === 0) return null;
+
+                  const provider = providers.find((p) => p.id === walkBookings[0].provider_id);
+                  const isPackWalk = walkBookings.length > 1;
+                  const walkBreadcrumbs = activeWalkBreadcrumbs.filter(b => b.walk_session_id === sessionId);
+
                   return (
-                    <div key={booking.id}>
+                    <div key={sessionId} className="mb-6 last:mb-0">
                       <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-green-200 mb-4">
                         <div className="flex items-center space-x-3">
                           <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
                             <User className="w-6 h-6 text-green-700" />
                           </div>
                           <div>
-                            <p className="font-semibold text-gray-900">{provider?.full_name}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-gray-900">{provider?.full_name}</p>
+                              {isPackWalk && (
+                                <Badge className="bg-violet-100 text-violet-900 hover:bg-violet-100">
+                                  <Users className="w-3 h-3 mr-1" />
+                                  Pack Walk ({walkBookings.length} dogs)
+                                </Badge>
+                              )}
+                            </div>
                             <p className="text-sm text-gray-600">
-                              {booking.scheduled_at && format(new Date(booking.scheduled_at), 'PPP')} at{' '}
-                              {booking.scheduled_at && format(new Date(booking.scheduled_at), 'HH:mm')}
+                              {walkBookings[0].scheduled_at && format(new Date(walkBookings[0].scheduled_at), 'PPP')} at{' '}
+                              {walkBookings[0].scheduled_at && format(new Date(walkBookings[0].scheduled_at), 'HH:mm')}
                             </p>
-                            <p className="text-sm text-gray-600">• R{booking.total_fee?.toFixed(2) || 'N/A'}</p>
+                            <p className="text-sm text-gray-600">• Total: R{walkBookings.reduce((sum, b) => sum + Number(b.total_fee || 0), 0).toFixed(2)}</p>
                           </div>
                         </div>
-                        <Button size="sm" className="bg-green-700 hover:bg-green-800" disabled>
+                        <Button 
+                          size="sm" 
+                          onClick={() => navigate(`/live-walk/${sessionId}`)}
+                          className="bg-green-700 hover:bg-green-800"
+                        >
                           <Navigation className="w-4 h-4 mr-2" />
-                          GPS Tracking Active
+                          {isPackWalk ? 'View Pack Walk' : 'View Walk'}
                         </Button>
                       </div>
+
+                      {/* Show dogs in this pack walk */}
+                      {isPackWalk && (
+                        <div className="bg-white rounded-lg border border-green-200 p-4 mb-4">
+                          <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                            <Users className="w-4 h-4 text-violet-700" />
+                            Dogs in Pack ({walkBookings.length})
+                          </h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {walkBookings.map((booking) => {
+                              const dog = myDogs.find((d) => d.id === booking.dog_id) || null;
+                              const isMyDog = booking.client_id === currentUser?.id;
+
+                              return (
+                                <div 
+                                  key={booking.id} 
+                                  className={`flex items-center gap-3 p-3 rounded-lg ${isMyDog ? 'bg-violet-50 border border-violet-200' : 'bg-slate-50 border border-slate-200'}`}
+                                >
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isMyDog ? 'bg-violet-200' : 'bg-slate-200'}`}>
+                                    <DogIcon className="w-4 h-4 text-slate-700" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <p className={`text-sm font-semibold ${isMyDog ? 'text-violet-900' : 'text-slate-900'}`}>
+                                      {dog?.name || 'Dog'}
+                                      {isMyDog && <span className="ml-1 text-xs text-violet-700">(Your dog)</span>}
+                                    </p>
+                                    <p className="text-xs text-slate-600">Status: {booking.status}</p>
+                                  </div>
+                                  {isMyDog && (
+                                    <Badge className="bg-violet-100 text-violet-900 hover:bg-violet-100">
+                                      My Dog
+                                    </Badge>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
 
                       <div className="bg-white rounded-lg border border-green-200 p-4">
                         <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -551,11 +627,11 @@ const ClientDashboard = () => {
                             <div className="animate-spin rounded-full h-6 w-6 border-2 border-green-700 border-t-transparent mx-auto mb-2"></div>
                             <p className="text-sm">Loading location data...</p>
                           </div>
-                        ) : activeWalkBreadcrumbs.length === 0 ? (
+                        ) : walkBreadcrumbs.length === 0 ? (
                           <p className="text-sm text-gray-500 text-center py-4">No location data yet. Walk just started!</p>
                         ) : (
                           <div className="space-y-2 max-h-64 overflow-y-auto">
-                            {activeWalkBreadcrumbs.map((crumb, index) => (
+                            {walkBreadcrumbs.map((crumb, index) => (
                               <div key={crumb.id} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
                                 <div className="flex items-center gap-2">
                                   <Badge variant="outline" className="text-xs">
