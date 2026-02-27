@@ -533,7 +533,7 @@ const AdminDashboard = () => {
                       return (
                         <TableRow key={dog.id}>
                           <TableCell className="font-medium">{dog.name}</TableCell>
-                          <TableCell>{dog.breed}</TableCell>
+                          <TableCell>{dog.breed || 'Unknown breed'}</TableCell>
                           <TableCell>{dog.age ?? '-'}</TableCell>
                           <TableCell>{owner?.full_name || dog.owner_id.slice(0, 8) + '...'}</TableCell>
                           <TableCell>{dog.created_at ? format(new Date(dog.created_at), 'PPP') : '-'}</TableCell>

@@ -247,7 +247,7 @@ const ClientDashboard = () => {
     return () => {
       channels.forEach(channel => supabase.removeChannel(channel));
     };
-  }, [bookings, myActiveWalkIds]);
+  }, [myActiveWalkIds.join(',')]);
 
   const handleRateBooking = (booking: Booking) => {
     setRatingBooking(booking);
@@ -850,7 +850,7 @@ const ClientDashboard = () => {
                                         <SelectContent>
                                           {myDogs.map((dog) => (
                                             <SelectItem key={dog.id} value={dog.id}>
-                                              {dog.name} ({dog.breed})
+                                              {dog.name} ({dog.breed || 'Unknown breed'})
                                             </SelectItem>
                                           ))}
                                         </SelectContent>
