@@ -65,6 +65,11 @@ export default function MyBookings() {
   const upcoming = useMemo(() => bookings.filter((b) => b.status === 'pending' || b.status === 'confirmed'), [bookings]);
   const completed = useMemo(() => bookings.filter((b) => b.status === 'completed'), [bookings]);
 
+  // Filter completed bookings to exclude those with zero or null fees
+  const completedWithFees = useMemo(() => {
+    return completed.filter((b) => b.total_fee != null && Number(b.total_fee) > 0);
+  }, [completed]);
+
   const Empty = () => (
     <Card className="rounded-2xl border-dashed border-slate-300 bg-white">
       <CardContent className="py-14">
@@ -230,13 +235,13 @@ export default function MyBookings() {
 
             <section>
               <h2 className="mb-3 text-sm font-extrabold uppercase tracking-wider text-slate-900">Completed</h2>
-              {completed.length === 0 ? (
+              {completedWithFees.length === 0 ? (
                 <Card className="rounded-2xl border-slate-200 bg-white">
                   <CardContent className="py-8 text-center text-sm font-medium text-slate-600">No completed walks yet.</CardContent>
                 </Card>
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {completed.map((b) => (
+                  {completedWithFees.map((b) => (
                     <BookingRow key={b.id} booking={b} />
                   ))}
                 </div>

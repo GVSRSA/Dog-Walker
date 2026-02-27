@@ -77,6 +77,11 @@ const ClientDashboard = () => {
     return groups;
   }, [activeBookings]);
 
+  // Filter completed bookings to exclude those with zero or null fees
+  const completedBookingsWithFees = useMemo(() => {
+    return completedBookings.filter((b) => b.total_fee != null && Number(b.total_fee) > 0);
+  }, [completedBookings]);
+
   const myActiveWalkIds = Object.values(groupedActiveWalks).filter(group => 
     group.some(b => b.client_id === currentUser?.id)
   ).flatMap(group => group.map(b => b.walk_session_id || b.id));
@@ -670,7 +675,7 @@ const ClientDashboard = () => {
           )}
 
           {/* Booking History */}
-          {completedBookings.length > 0 && (
+          {completedBookingsWithFees.length > 0 && (
             <Card className="mb-8">
               <CardHeader>
                 <CardTitle>Booking History</CardTitle>
@@ -678,7 +683,7 @@ const ClientDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {completedBookings.map((booking) => {
+                  {completedBookingsWithFees.map((booking) => {
                     const provider = providers.find((p) => p.id === booking.provider_id);
                     const dog = myDogs.find((d) => d.id === booking.dog_id) || null;
 

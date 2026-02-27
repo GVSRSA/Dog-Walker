@@ -524,7 +524,7 @@ export default function LiveWalk() {
       // Safety check: only the walker can complete a session, and only once.
       const { data: current, error: fetchErr } = await supabase
         .from('walk_sessions')
-        .select('status')
+        .select('status, started_at')
         .eq('id', sessionId)
         .single();
       if (fetchErr) throw fetchErr;
@@ -534,10 +534,55 @@ export default function LiveWalk() {
         return;
       }
 
+      // Calculate actual walk duration
+      const startedAt = (current as any)?.started_at;
+      const endedAt = new Date();
+      let actualDurationMinutes = 30; // Default fallback duration
+
+      if (startedAt) {
+        const startTime = new Date(startedAt).getTime();
+        const endTime = endedAt.getTime();
+        const elapsedMinutes = Math.floor((endTime - startTime) / (1000 * 60));
+        actualDurationMinutes = elapsedMinutes > 0 ? elapsedMinutes : 30; // Ensure at least 30 minutes
+      }
+
+      // Fetch all bookings in this session with provider info to recalculate payouts
+      const { data: sessionBookings, error: bookingsFetchError } = await supabase
+        .from('bookings')
+        .select('id, provider_id, duration, total_fee, platform_fee, provider_payout')
+        .eq('walk_session_id', sessionId);
+
+      if (bookingsFetchError) throw bookingsFetchError;
+
+      // Recalculate provider_payout for each booking based on actual walk duration
+      if (sessionBookings && sessionBookings.length > 0) {
+        const updates = sessionBookings.map((booking: any) => {
+          // Use the original booking's provider rate to calculate payout
+          const originalDuration = Number(booking.duration || 30);
+          const originalPayout = Number(booking.provider_payout || 0);
+          
+          // Calculate new payout based on actual duration
+          const newPayout = (actualDurationMinutes / originalDuration) * originalPayout;
+          
+          return {
+            id: booking.id,
+            provider_payout: newPayout,
+          };
+        });
+
+        // Update all bookings with recalculated payouts
+        for (const update of updates) {
+          await supabase
+            .from('bookings')
+            .update({ provider_payout: update.provider_payout })
+            .eq('id', update.id);
+        }
+      }
+
       // IMPORTANT: mark linked bookings as completed FIRST so the AFTER UPDATE trigger fires.
       const { error: bookingsErr } = await supabase
         .from('bookings')
-        .update({ status: 'completed', ended_at: new Date().toISOString() })
+        .update({ status: 'completed', ended_at: endedAt.toISOString() })
         .eq('walk_session_id', sessionId)
         .neq('status', 'completed');
       if (bookingsErr) throw bookingsErr;
@@ -545,15 +590,15 @@ export default function LiveWalk() {
       // Then close the session
       const { error: sessionErr } = await supabase
         .from('walk_sessions')
-        .update({ status: 'completed', ended_at: new Date().toISOString() })
+        .update({ status: 'completed', ended_at: endedAt.toISOString() })
         .eq('id', sessionId)
         .eq('status', 'active');
       if (sessionErr) throw sessionErr;
 
-      setSession((prev) => (prev ? { ...prev, status: 'completed', ended_at: new Date().toISOString() } : prev));
+      setSession((prev) => (prev ? { ...prev, status: 'completed', ended_at: endedAt.toISOString() } : prev));
       setShowSummary(true);
 
-      toast({ title: 'Walk ended', description: 'All linked bookings were marked completed. Add a quick summary for owners.' });
+      toast({ title: 'Walk ended', description: `Walk duration: ${actualDurationMinutes} minutes. All linked bookings were marked completed with recalculated earnings.` });
     } catch (e: any) {
       toast({ title: 'Could not end walk', description: e?.message || 'Please try again.', variant: 'destructive' });
     }
