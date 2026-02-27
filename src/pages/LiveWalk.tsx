@@ -13,8 +13,8 @@ import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
-import type { WalkBreadcrumb, WalkSession } from '@/types';
-import { MapPin, Satellite, Users, NotebookText, Droplets, Receipt, Wallet } from 'lucide-react';
+import type { WalkBreadcrumb, WalkSession, Booking } from '@/types';
+import { MapPin, Satellite, Users, NotebookText, Droplets, Receipt, Wallet, Dog as DogIcon } from 'lucide-react';
 import { format } from 'date-fns';
 
 const FALLBACK_CENTER = {
@@ -74,6 +74,12 @@ export default function LiveWalk() {
   const [showReceipt, setShowReceipt] = useState(false);
   const [receipt, setReceipt] = useState<{ spent: number; newBalance: number; didPee: boolean; didPoop: boolean } | null>(null);
 
+  // New state for pack walk bookings
+  const [packBookings, setPackBookings] = useState<Booking[]>([]);
+  const [dogNames, setDogNames] = useState<Record<string, string>>({});
+  const [providerNames, setProviderNames] = useState<Record<string, string>>({});
+  const [loadingPack, setLoadingPack] = useState(false);
+
   const watchIdRef = useRef<number | null>(null);
   const insertCooldownRef = useRef<number>(0);
   const permissionToastRef = useRef(false);
@@ -111,6 +117,88 @@ export default function LiveWalk() {
   const hasGpsFix = useMemo(() => {
     return session?.current_lat != null && session?.current_lng != null;
   }, [session?.current_lat, session?.current_lng]);
+
+  // Load pack walk bookings (all bookings linked to this session)
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const loadPackWalkData = async () => {
+      setLoadingPack(true);
+      try {
+        // Fetch all bookings for this walk session
+        const { data: bookingsData, error: bookingsError } = await supabase
+          .from('bookings')
+          .select('id, dog_id, client_id, provider_id, status, total_fee, dogs(name)')
+          .eq('walk_session_id', sessionId);
+
+        if (bookingsError) {
+          console.error('[live-walk] Error loading pack bookings:', bookingsError);
+        } else {
+          setPackBookings((bookingsData || []) as any[]);
+          
+          // Load dog names
+          const dogIds = bookingsData?.map((b: any) => b.dog_id).filter(Boolean) || [];
+          if (dogIds.length > 0) {
+            const { data: dogsData, error: dogsError } = await supabase
+              .from('dogs')
+              .select('id, name')
+              .in('id', dogIds);
+            
+            if (!dogsError && dogsData) {
+              const names: Record<string, string> = {};
+              dogsData.forEach((d: any) => {
+                if (d?.id) names[d.id] = d.name || 'Dog';
+              });
+              setDogNames(names);
+            }
+          }
+
+          // Load provider name for clients
+          if (!isProvider && bookingsData && bookingsData.length > 0) {
+            const providerId = bookingsData[0].provider_id;
+            if (providerId) {
+              const { data: providerData, error: providerError } = await supabase
+                .from('profiles')
+                .select('id, full_name')
+                .eq('id', providerId)
+                .single();
+              
+              if (!providerError && providerData) {
+                setProviderNames({ [providerId]: providerData.full_name || 'Provider' });
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[live-walk] Error loading pack walk data:', err);
+      } finally {
+        setLoadingPack(false);
+      }
+    };
+
+    loadPackWalkData();
+
+    // Subscribe to booking changes for this session
+    const channel = supabase
+      .channel(`pack_walk_bookings:${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bookings',
+          filter: `walk_session_id=eq.${sessionId}`,
+        },
+        () => {
+          loadPackWalkData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sessionId, isProvider]);
 
   // Initial load: session + latest breadcrumbs
   useEffect(() => {
@@ -648,6 +736,72 @@ export default function LiveWalk() {
             </Card>
 
             <div className="space-y-6">
+              {/* Pack Walk Dogs Section - Shows all dogs in this shared session */}
+              {packBookings.length > 0 && (
+                <Card className="rounded-2xl border-violet-200 bg-violet-50">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Users className="h-4 w-4 text-violet-700" />
+                      Pack Walk ({packBookings.length} dog{packBookings.length > 1 ? 's' : ''})
+                    </CardTitle>
+                    <CardDescription>
+                      {isProvider 
+                        ? 'All dogs in this shared session.'
+                        : isClient && packBookings.some(b => b.client_id === currentUser?.id)
+                        ? 'Your dog and others in this pack.'
+                        : 'Track the pack in real-time.'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingPack ? (
+                      <div className="text-center py-4 text-sm text-slate-600">Loading pack details...</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {packBookings.map((booking) => {
+                          const dogName = (booking as any).dogs?.name || dogNames[booking.dog_id || ''] || 'Dog';
+                          const isMyDog = isClient && booking.client_id === currentUser?.id;
+                          
+                          return (
+                            <div 
+                              key={booking.id} 
+                              className={`flex items-center justify-between rounded-2xl p-3 ring-1 ${
+                                isMyDog ? 'bg-violet-100 ring-violet-200' : 'bg-white ring-slate-200'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className={`grid h-8 w-8 place-items-center rounded-full ${
+                                  isMyDog ? 'bg-violet-200' : 'bg-slate-100'
+                                }`}>
+                                  <DogIcon className="h-4 w-4 text-slate-700" />
+                                </div>
+                                <div>
+                                  <p className={`text-sm font-extrabold ${isMyDog ? 'text-violet-900' : 'text-slate-900'}`}>
+                                    {dogName}
+                                  </p>
+                                  <p className="text-xs font-semibold text-slate-600">
+                                    {isMyDog && <span className="text-violet-700">Your dog • </span>}
+                                    Status: {booking.status}
+                                  </p>
+                                </div>
+                              </div>
+                              <Badge 
+                                className={`rounded-full ${
+                                  isMyDog 
+                                    ? 'bg-violet-200 text-violet-900 hover:bg-violet-200' 
+                                    : 'bg-slate-100 text-slate-900 hover:bg-slate-100'
+                                }`}
+                              >
+                                {booking.status === 'in_progress' ? 'Walking' : booking.status}
+                              </Badge>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
               {isProvider && !showSummary && (
                 <WalkControls
                   mode={session?.status === 'active' ? 'end' : 'start'}
