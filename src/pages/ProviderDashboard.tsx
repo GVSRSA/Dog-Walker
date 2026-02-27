@@ -83,6 +83,31 @@ const ProviderDashboard = () => {
     setBookings((data || []) as Booking[]);
   }
 
+  // Keep provider dashboard in sync with live DB changes (e.g. manual status flips to in_progress)
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    const channel = supabase
+      .channel(`provider_bookings:${currentUser.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bookings',
+          filter: `provider_id=eq.${currentUser.id}`,
+        },
+        () => {
+          refreshBookings();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser?.id]);
+
   useEffect(() => {
     const dogIds = Array.from(
       new Set(
@@ -233,8 +258,13 @@ const ProviderDashboard = () => {
 
       if (bErr) throw bErr;
 
+      const startedAt = new Date().toISOString();
+
       if (bData?.walk_session_id) {
-        await supabase.from('bookings').update({ status: 'in_progress' }).eq('id', bookingId);
+        await supabase
+          .from('bookings')
+          .update({ status: 'in_progress', started_at: startedAt })
+          .eq('id', bookingId);
         await refreshBookings();
         navigate(`/live-walk/${bData.walk_session_id}`);
         return;
@@ -253,7 +283,7 @@ const ProviderDashboard = () => {
 
       const { error } = await supabase
         .from('bookings')
-        .update({ status: 'in_progress', walk_session_id: sessionId })
+        .update({ status: 'in_progress', walk_session_id: sessionId, started_at: startedAt })
         .eq('id', bookingId);
 
       if (error) {
@@ -322,7 +352,12 @@ const ProviderDashboard = () => {
         setTrackingInterval(null);
       }
 
-      const { error } = await supabase.from('bookings').update({ status: 'completed' }).eq('id', bookingId);
+      const endedAt = new Date().toISOString();
+
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: 'completed', ended_at: endedAt })
+        .eq('id', bookingId);
 
       if (error) {
         console.error('Error ending walk:', error);
@@ -389,8 +424,8 @@ const ProviderDashboard = () => {
   const pendingBookings = bookings.filter((b) => b.status === 'pending');
   const confirmedBookings = bookings.filter((b) => b.status === 'confirmed');
   const todaysConfirmedBookings = confirmedBookings.filter((b) => isToday(b.scheduled_date));
-  const inProgressBookings = bookings.filter((b) => b.status === 'in_progress');
-  const activeBookings = bookings.filter((b) => b.status === 'active');
+  const inProgressBookings = bookings.filter((b) => b.status === 'in_progress' && Boolean(b.walk_session_id));
+  const activeBookings = bookings.filter((b) => (b.status === 'active' || b.status === 'in_progress') && !b.walk_session_id);
   const completedBookings = bookings.filter((b) => b.status === 'completed');
 
   const totalEarnings = completedBookings.reduce((sum, b) => {
@@ -430,30 +465,27 @@ const ProviderDashboard = () => {
                 <Star className="h-4 w-4 text-amber-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{provider?.avg_rating?.toFixed(1) || 'No ratings yet'}</div>
-                <p className="text-xs text-gray-600">{provider?.review_count || 0} reviews</p>
+                <div className="text-2xl font-bold">{provider.avg_rating || 0}</div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Walk Rate</CardTitle>
-                <DollarSign className="h-4 w-4 text-blue-700" />
+                <CardTitle className="text-sm font-medium">Total Walks</CardTitle>
+                <Clock className="h-4 w-4 text-blue-700" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">R{provider?.walk_rate || 0}</div>
-                <p className="text-xs text-gray-600">per walk</p>
+                <div className="text-2xl font-bold">{provider.total_walks || 0}</div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
-                <ShoppingCart className="h-4 w-4 text-blue-700" />
+                <DollarSign className="h-4 w-4 text-emerald-700" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">R{totalEarnings.toFixed(2)}</div>
-                <p className="text-xs text-gray-600">{completedBookings.length} completed</p>
               </CardContent>
             </Card>
           </div>
@@ -580,19 +612,19 @@ const ProviderDashboard = () => {
               </Card>
             )}
 
-            {/* Active Walks */}
+            {/* Active Walks (solo / manual in_progress without a session) */}
             {activeBookings.length > 0 && (
-              <Card className="border-green-300 bg-green-50">
+              <Card className="border-rose-300 bg-rose-50">
                 <CardHeader>
-                  <CardTitle className="text-green-900">Active Walk in Progress</CardTitle>
-                  <CardDescription>GPS tracking is active</CardDescription>
+                  <CardTitle className="text-rose-950">Walk In Progress</CardTitle>
+                  <CardDescription>End the walk to complete the booking and trigger the credit debit.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {activeBookings.map((booking) => (
                     <div key={booking.id} className="flex items-center justify-between">
                       <div>
                         <p className="font-semibold">Walking {bookingDogName(booking)}</p>
-                        <p className="text-sm text-gray-600">Tracking location...</p>
+                        <p className="text-sm text-rose-900/70">Status: {booking.status}</p>
                       </div>
                       <Button size="sm" onClick={() => handleEndWalk(booking.id)} className="bg-red-600 hover:bg-red-700">
                         <Square className="w-4 h-4 mr-1" />
@@ -698,85 +730,46 @@ const ProviderDashboard = () => {
                 </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="saturday">Saturday</Label>
-                  <Switch id="saturday" />
+                  <Switch id="saturday" defaultChecked />
                 </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="sunday">Sunday</Label>
-                  <Switch id="sunday" />
+                  <Switch id="sunday" defaultChecked />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="availability-start">Start Time</Label>
-                    <Input id="availability-start" name="availability-start" type="time" defaultValue="08:00" />
-                  </div>
-                  <div>
-                    <Label htmlFor="availability-end">End Time</Label>
-                    <Input id="availability-end" name="availability-end" type="time" defaultValue="18:00" />
-                  </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Profile</CardTitle>
+                <CardDescription>Manage your account</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input id="name" defaultValue={provider.full_name} />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input id="email" defaultValue={provider.email} disabled />
+                </div>
+                <Button className="w-full bg-green-700 hover:bg-green-800">Update Profile</Button>
+                <Button variant="outline" className="w-full" onClick={() => logout()}>
+                  Logout
+                </Button>
               </CardContent>
             </Card>
           </section>
         </div>
+
+        <RatingModal
+          isOpen={showRatingModal}
+          onClose={() => setShowRatingModal(false)}
+          onSubmit={handleRatingSubmit}
+          userName={(ratingBooking as any)?.client?.full_name || 'Client'}
+          isProvider={true}
+        />
       </div>
-
-      {/* Purchase Credits Modal */}
-      {showPurchaseModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle>Purchase Credits</CardTitle>
-              <CardDescription>Buy credits to accept more bookings</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
-                {[5, 10, 20].map((amount) => (
-                  <Button
-                    key={amount}
-                    variant={creditAmount === amount ? 'default' : 'outline'}
-                    onClick={() => setCreditAmount(amount)}
-                    className={
-                      creditAmount === amount
-                        ? 'bg-green-700 hover:bg-green-800'
-                        : 'text-green-700 border-green-300 hover:bg-green-50'
-                    }
-                  >
-                    {amount} credits
-                  </Button>
-                ))}
-              </div>
-              <div className="text-center p-4 bg-green-100 rounded-lg">
-                <p className="text-2xl font-bold text-green-900">R{(creditAmount * 50).toFixed(2)}</p>
-                <p className="text-sm text-gray-600">Total cost</p>
-              </div>
-              <div className="flex gap-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowPurchaseModal(false)}
-                  className="flex-1 text-green-700 border-green-300 hover:bg-green-50"
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handlePurchaseCredits} className="flex-1 bg-green-700 hover:bg-green-800">
-                  Purchase
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Rating Modal */}
-      <RatingModal
-        isOpen={showRatingModal}
-        onClose={() => {
-          setShowRatingModal(false);
-          setRatingBooking(null);
-        }}
-        onSubmit={handleRatingSubmit}
-        userName={`Client ${ratingBooking?.client_id?.slice(0, 8)}...`}
-        isProvider={false}
-      />
     </div>
   );
 };
