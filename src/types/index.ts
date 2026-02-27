@@ -58,6 +58,7 @@ export interface Booking {
   total_fee?: number;
   platform_fee?: number;
   provider_payout?: number;
+  rating?: number | null;
   created_at?: string;
   started_at?: string | null;
   ended_at?: string | null;

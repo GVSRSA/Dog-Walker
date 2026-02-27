@@ -226,26 +226,33 @@ const ClientDashboard = () => {
     if (!ratingBooking || !rating) return;
 
     try {
-      const { error } = await supabase.from('reviews').insert({
-        booking_id: ratingBooking.id,
-        reviewer_id: currentUser.id,
-        provider_id: ratingBooking.provider_id,
-        rating,
-        comment,
-        created_at: new Date().toISOString(),
-      });
+      const { error } = await supabase
+        .from('bookings')
+        .update({ rating })
+        .eq('id', ratingBooking.id);
 
       if (error) {
-        console.error('Error submitting review:', error);
-        alert('Failed to submit review');
+        console.error('Error submitting rating:', error);
+        alert('Failed to submit rating');
       } else {
         setShowRatingModal(false);
         setRatingBooking(null);
-        alert('Review submitted successfully!');
+        alert('Rating submitted successfully!');
+
+        // Refresh bookings so the receipt dialog shows the saved rating.
+        const { data: bookingsData, error: fetchError } = await supabase
+          .from('bookings')
+          .select('*, dogs(name)')
+          .eq('client_id', currentUser.id)
+          .order('scheduled_date', { ascending: false });
+
+        if (!fetchError) {
+          setBookings((bookingsData || []) as any);
+        }
       }
     } catch (err) {
       console.error('Error:', err);
-      alert('Failed to submit review');
+      alert('Failed to submit rating');
     }
   };
 
