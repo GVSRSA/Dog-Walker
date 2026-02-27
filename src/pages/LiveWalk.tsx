@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import RoleNavbar from '@/components/RoleNavbar';
+import WalkControls from '@/components/WalkControls';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import type { WalkBreadcrumb, WalkSession } from '@/types';
-import { MapPin, Navigation, Satellite, Square, Users, NotebookText, Droplets, Crosshair, Receipt, Wallet } from 'lucide-react';
+import { MapPin, Satellite, Users, NotebookText, Droplets, Receipt, Wallet } from 'lucide-react';
 import { format } from 'date-fns';
 
 const FALLBACK_CENTER = {
@@ -135,6 +136,9 @@ export default function LiveWalk() {
 
       setSession((s as any) || null);
       setTrail(((crumbs as any) || []) as WalkBreadcrumb[]);
+
+      // Sync UI toggle with session state so refresh/resume shows the correct button.
+      setIsSharing((s as any)?.status === 'active');
     };
 
     load();
@@ -164,6 +168,37 @@ export default function LiveWalk() {
       supabase.removeChannel(channel);
     };
   }, [sessionId, isClient]);
+
+  // Provider: also subscribe to session updates so the UI reflects resumed/in-progress status.
+  useEffect(() => {
+    if (!sessionId || !isProvider) return;
+
+    const channel = supabase
+      .channel(`walk_sessions_provider:${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'walk_sessions',
+          filter: `id=eq.${sessionId}`,
+        },
+        (payload) => {
+          setSession(payload.new as WalkSession);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sessionId, isProvider]);
+
+  // Keep local isSharing in sync if session status changes (e.g. resumed from another device).
+  useEffect(() => {
+    if (!isProvider) return;
+    setIsSharing(session?.status === 'active');
+  }, [session?.status, isProvider]);
 
   // Client: also subscribe to breadcrumbs so the recent list updates
   useEffect(() => {
@@ -411,15 +446,21 @@ export default function LiveWalk() {
         return;
       }
 
+      // IMPORTANT: mark linked bookings as completed FIRST so the AFTER UPDATE trigger fires.
+      const { error: bookingsErr } = await supabase
+        .from('bookings')
+        .update({ status: 'completed', ended_at: new Date().toISOString() })
+        .eq('walk_session_id', sessionId)
+        .neq('status', 'completed');
+      if (bookingsErr) throw bookingsErr;
+
+      // Then close the session
       const { error: sessionErr } = await supabase
         .from('walk_sessions')
         .update({ status: 'completed', ended_at: new Date().toISOString() })
         .eq('id', sessionId)
         .eq('status', 'active');
       if (sessionErr) throw sessionErr;
-
-      const { error: bookingsErr } = await supabase.from('bookings').update({ status: 'completed' }).eq('walk_session_id', sessionId);
-      if (bookingsErr) throw bookingsErr;
 
       setSession((prev) => (prev ? { ...prev, status: 'completed', ended_at: new Date().toISOString() } : prev));
       setShowSummary(true);
@@ -581,68 +622,25 @@ export default function LiveWalk() {
 
             <div className="space-y-6">
               {isProvider && !showSummary && (
-                <Card className="rounded-2xl border-slate-200 bg-white">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Navigation className="h-4 w-4 text-emerald-700" />
-                      Walk controls
-                    </CardTitle>
-                    <CardDescription>
-                      {isCompleted
-                        ? 'This walk is completed.'
-                        : 'Tap Start to begin sharing location. For testing, Force GPS Ping inserts one breadcrumb immediately.'}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Button
-                      onClick={async () => {
-                        if (isCompleted) return;
+                <WalkControls
+                  mode={session?.status === 'active' ? 'end' : 'start'}
+                  disabled={isCompleted}
+                  pinging={pinging}
+                  onPrimary={async () => {
+                    if (isCompleted) return;
 
-                        if (isSharing) {
-                          void endWalk();
-                          return;
-                        }
+                    if (session?.status === 'active') {
+                      await endWalk();
+                      return;
+                    }
 
-                        // Flip sharing on and immediately request location once to trigger browser permissions.
-                        permissionToastRef.current = false;
-                        setIsSharing(true);
-                        await forceGpsPing();
-                      }}
-                      disabled={isCompleted}
-                      className={
-                        isSharing
-                          ? 'w-full rounded-full bg-rose-600 hover:bg-rose-700'
-                          : 'w-full rounded-full bg-emerald-700 hover:bg-emerald-800'
-                      }
-                    >
-                      {isSharing ? (
-                        <>
-                          <Square className="mr-2 h-4 w-4" />
-                          End Walk
-                        </>
-                      ) : (
-                        <>
-                          <Navigation className="mr-2 h-4 w-4" />
-                          Start Walk
-                        </>
-                      )}
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      onClick={forceGpsPing}
-                      disabled={pinging || isCompleted}
-                      className="w-full rounded-full border-slate-200 bg-white text-slate-900 hover:bg-slate-50"
-                    >
-                      <Crosshair className="mr-2 h-4 w-4" />
-                      {pinging ? 'Pinging…' : 'Force GPS Ping'}
-                    </Button>
-
-                    <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-100">
-                      <p className="text-xs font-semibold text-slate-700">Keep this tab open while walking so clients can follow the pack in real time.</p>
-                    </div>
-                  </CardContent>
-                </Card>
+                    // Flip sharing on and immediately request location once to trigger browser permissions.
+                    permissionToastRef.current = false;
+                    setIsSharing(true);
+                    await forceGpsPing();
+                  }}
+                  onForcePing={forceGpsPing}
+                />
               )}
 
               {isClient && isCompleted && (
@@ -719,49 +717,56 @@ export default function LiveWalk() {
               <Card className="rounded-2xl border-slate-200 bg-white">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-base">
-                    <Users className="h-4 w-4 text-violet-700" />
-                    Recent updates
+                    <MapPin className="h-4 w-4 text-emerald-700" />
+                    Recent pings
                   </CardTitle>
-                  <CardDescription>Latest 10 breadcrumbs</CardDescription>
+                  <CardDescription>Latest GPS pings inserted for this session.</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-3">
                   {trail.length === 0 ? (
-                    <p className="text-sm font-medium text-slate-600">No breadcrumbs yet.</p>
+                    <div className="rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-600 ring-1 ring-slate-100">
+                      No breadcrumbs yet. Use Force GPS Ping to insert one.
+                    </div>
                   ) : (
                     <div className="space-y-2">
-                      {trail.map((c, idx) => (
-                        <div key={c.id} className="flex items-center justify-between rounded-xl bg-slate-50 p-3 ring-1 ring-slate-100">
-                          <div className="text-sm">
-                            <p className="font-extrabold text-slate-900">{idx === 0 ? 'Latest' : `-${idx}`}</p>
-                            <p className="mt-0.5 text-xs font-semibold text-slate-600">
-                              {Number(c.lat).toFixed(5)}, {Number(c.lng).toFixed(5)}
+                      {trail.map((crumb) => (
+                        <div key={crumb.id} className="flex items-center justify-between rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100">
+                          <div>
+                            <p className="text-sm font-bold text-slate-900">
+                              {Number(crumb.lat).toFixed(5)}, {Number(crumb.lng).toFixed(5)}
                             </p>
+                            <p className="text-xs font-semibold text-slate-600">{format(new Date(crumb.created_at), 'PPpp')}</p>
                           </div>
-                          <p className="text-xs font-semibold text-slate-500">{format(new Date(c.created_at), 'HH:mm:ss')}</p>
                         </div>
                       ))}
                     </div>
                   )}
-                </CardContent>
-              </Card>
 
-              <Card className="rounded-2xl border-slate-200 bg-white">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <MapPin className="h-4 w-4 text-blue-700" />
-                    Session
-                  </CardTitle>
-                  <CardDescription>Session ID {sessionId.slice(0, 8)}…</CardDescription>
-                </CardHeader>
-                <CardContent className="text-sm font-medium text-slate-700">
-                  {session?.started_at ? (
-                    <p>
-                      Started {format(new Date(session.started_at), 'PPP p')}
-                      {session.ended_at ? ` • Ended ${format(new Date(session.ended_at), 'PPP p')}` : ''}
-                    </p>
-                  ) : (
-                    <p>—</p>
+                  {isClient && (
+                    <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
+                      <p className="text-sm font-semibold text-slate-700">What you're seeing</p>
+                      <p className="mt-1 text-sm text-slate-600">
+                        The walker's device sends GPS pings every few seconds. You'll see the latest trail here and the map will follow the most recent location.
+                      </p>
+                    </div>
                   )}
+
+                  {!isClient && (
+                    <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
+                      <p className="text-sm font-semibold text-slate-700">Tip</p>
+                      <p className="mt-1 text-sm text-slate-600">
+                        If GPS permissions are blocked, click Force GPS Ping to test inserts into <span className="font-semibold">walk_breadcrumbs</span> for this session.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-emerald-700" />
+                      <p className="text-sm font-bold text-emerald-900">Session ID</p>
+                    </div>
+                    <p className="mt-1 break-all text-xs font-semibold text-emerald-900/80">{sessionId}</p>
+                  </div>
                 </CardContent>
               </Card>
             </div>
