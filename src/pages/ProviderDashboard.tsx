@@ -506,7 +506,7 @@ const ProviderDashboard = () => {
   const activeBookings = bookings.filter((b) => (b.status === 'active' || b.status === 'in_progress') && !b.walk_session_id);
   const completedBookings = bookings.filter((b) => b.status === 'completed');
 
-  const completedWalkCount = completedBookings.length;
+  const completedWalkCount = bookings.filter((b) => b.status === 'completed').length;
 
   const totalEarnings = completedBookings.reduce((sum, b) => {
     const payout = typeof b.provider_payout === 'number' ? b.provider_payout : Number(b.provider_payout);
@@ -616,7 +616,7 @@ const ProviderDashboard = () => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
+                <CardTitle className="text-sm font-medium">Net Earnings</CardTitle>
                 <DollarSign className="h-4 w-4 text-emerald-700" />
               </CardHeader>
               <CardContent>
@@ -821,6 +821,7 @@ const ProviderDashboard = () => {
                             <TableCell>
                               {booking.status === 'completed' && (
                                 <Button
+                                  type="button"
                                   size="sm"
                                   onClick={() => handleRateBooking(booking)}
                                   className="bg-amber-600 hover:bg-amber-700"
